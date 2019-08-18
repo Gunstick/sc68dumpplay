@@ -4,6 +4,9 @@ Plays an sc68 register dump on a real ST
 Such a dump can be produced with
 sc68 --ym-engine=dump --ym-clean-dump -qqq -o/dev/null  tune.sndh
 
+You can optimize the register usage with optdump.awk
+sc68 --ym-engine=dump --ym-clean-dump -qqq -o/dev/null Lap_27.sndh |
+./optdump.awk | head -1000 > lap27.dmp
 
 Fist version will just read the original ASCII and play it.
 Think of it as a very bad YM player.

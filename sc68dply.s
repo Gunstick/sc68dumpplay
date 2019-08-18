@@ -8,18 +8,13 @@
 
 ; wait (or irq?)
 
-intin equ   8                   ; setup some constants
-ptsin equ   12
+  include ulm-init.s
 
-start:
-   jsr   initialize  
-
+screen:
+   move.w #$777,$ffff8240.w   ; unblack screen
+   move.b #1,$ffff8260.w      ; mid rez
    jsr print
    dc.b "sc68 dump player",10,13,0
-;   move.l #hello,-(sp)    ; address of text to print
-;   move.w #9,-(sp)        ; gemdos cconws 
-;   trap #1                ; call gemdos
-;   addq.l #6,sp           ; correct stack
 
    lea sc68dump,a6   ; start of ascii dump
 ; 00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A  
@@ -41,8 +36,10 @@ regloop:      ; play all 13 values pointed to by a6
     bsr a6hexchar2bind0
     move.b d3,$ffff8800.w   ; select register
     move.b d0,$ffff8802.w   ; write value
-    lea 1(a6),a6
+    lea 3(a6),a6
 nextreg:
+   cmpi.b  #57,$fffffc02.w
+   beq     back
     addq.b #1,d3          ; next register number
     cmp.b #13,d3          ; we loop 14 times (0 to 13)
     ble.s regloop
@@ -51,66 +48,32 @@ skipreg:
     lea 3(a6),a6    ; we read a - so we skip this register
     bra.s nextreg
 regloopend:
- 
+    bsr waitvbl    ; function offered by ulm-init.s 
     cmpa.l #enddump,a6    ; are we at end of dump
-    ble.s playloop
+    ble playloop
 
-;   move.l #sc68dump,-(sp) ; address of text to print
-;   move.w #9,-(sp)        ; gemdos cconws 
-;   trap #1                ; call gemdos
-;   addq.l #6,sp           ; correct stack
+no_key:
+   cmpi.b  #57,$fffffc02.w
+   beq     back
 
-   move.l #presskey,-(sp)    ; address of text to print
-   move.w #9,-(sp)        ; gemdos cconws 
-   trap #1                ; call gemdos
-   addq.l #6,sp           ; correct stack
+    cmpi.b  #1,$fffffc02.w
+    bne.s   no_key
 
-   move.w   #7,-(a7)
-   trap  #1                     ;wait keypress
-   addq.l   #2,a7 
-   jsr   restore
-   clr.l    -(a7)               ;call gemdos
-   trap  #1
-   
-initialize:                     ; go into super user mode
-   clr.l -(a7) 
-   move.w #32,-(a7)  
-   trap #1     
-   addq.l #6,a7   
-   move.l d0,oldstack
-   ; set PSG into defined state
-psginit2:
-        moveq   #15,d0
-        lea     $ffff8800.w,a0
-        lea     psginittab,a1
-nextinit2:
-        move.b  (a1)+,(a0)
-        move.b  (a1)+,2(a0)
-        dbf     d0,nextinit2
-        rts
+; exit demo
+   jmp back
+ 
 
-
-   rts
-psginittab:dc.b 0,$ff,1,$ff,2,$ff,3,$ff,4,$ff,5,$ff,6,0
-        dc.b 7,%11111011,8,0,9,0,10,0,11,5,12,100,13,2,$ff,0
-        even
-   
-restore:                        ; go back into user mode
-   move.w (sp)+,sr
-   move.l oldstack,-(a7)
-   move.w #32,-(a7)
-   trap #1     
-   addq.l #6,a7
-   rts
+; some helper routines, not all used...   
 a6hexchar2bind0:
   ; converts the hexadecimal 2 characters at a0 to d0 binary byte
-    move.b (a6)+,d1
+    move.b (a6)+,d1  ; get up nibble
     bsr tobin        ; convert lower D0 to bin nibble
     move.b d1,d0     ; save value
-    move.b (a6)+,d1
+    lsl #4,d0        ; move it to upper nibble
+    move.b (a6)+,d1  ; get low nibble
     bsr tobin
-    lsl #4,d1
-    add.b d1,d0
+    add.b d1,d0      ; add lower nibble to result
+    lea -2(a6),a6    ; do not change a6
     rts 
 tobin:
     cmp.b #'A',d1    ; check if A-F
@@ -140,6 +103,8 @@ novalue:
 a3printa4:
   ; prints chars from a3 (included) to a4 (excluded)
   ; on return a3=a4
+  movem.l d0-d3/a0-a3/a4,-(sp)
+a3printa4next:
   cmpa.l    a3,a4
   beq.s a3printa4done
   clr.w     -(sp)  ; Offset 4 (make room for a word)
@@ -148,9 +113,11 @@ a3printa4:
   move.w    #3,-(sp)     ; Offset 0 bconout=3
   trap      #13          ; Call BIOS
   addq.l    #6,sp        ; Correct stack
-  bra.s a3printa4
+  bra.s a3printa4next
 a3printa4done:
+  movem.l (sp)+,d0-d3/a0-a3/a4
   rts
+
 ; a dumb print routine which prints the inline string after the jsr call until \0
 print:
  movem.l d0-d7/a0-a6,-(a7)
@@ -191,16 +158,40 @@ nextdeztohex:
 enddeztohex:
  movem.l (a7)+,a3/d1/d2
  rts
-
-oldstack dc.l 0
+bind0tohexa6:
+  ; converts d0 to 8 chars stating at a6
+  movem.l d0/d1/d2/a6,-(sp)
+  moveq #7,d2
+nextchar:
+  rol.l #4,d0        ; rotate topmost nibble at bottom
+  move.b d0,d1  ; low byte
+  and.b #$0f,d1   ; mask nibble
+  add.b #$30,d1   ; convert to number 
+  cmp.b #$3a,d1   ; compare with >9
+  blt isdigit
+ischar:
+  add.b #7,d1     ; make into char
+isdigit:
+  move.b d1,(a6)+
+  dbf d2,nextchar
+  movem.l (sp)+,d0/d1/d2/a6
+  rts
+; convert d0 to hax ascii and print to screen
+printhexd0:
+  movem.l d0-d3/a0-a3/a6,-(sp)
+  lea hexstring,a6
+  bsr bind0tohexa6
+  move.l #hexstring,-(sp) ; address of text to print
+  move.w #9,-(sp)        ; gemdos cconws 
+  trap #1                ; call gemdos
+  addq.l #6,sp           ; correct stack
+  movem.l (sp)+,d0-d3/a0-a3/a6
+  rts
+hexstring:
+  dc.b "        ",13,10,0
+  even
 
    data
-hello:
-  dc.b "Hello World",10,13,10,13,0
-  even
-presskey:
-  dc.b 10,13,"Press key",0
-  even
 sc68dump:
   incbin "lap27.dmp"
 enddump:
