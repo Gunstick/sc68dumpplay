@@ -19,7 +19,7 @@ BEGIN {
        prev[14]=""   # force write of envelope shape register
      }
    }else{
-     e=" "
+     e="-"
    }
    if(cur[i]==prev[i]) {
      printf(".." e)}

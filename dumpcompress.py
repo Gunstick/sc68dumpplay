@@ -11,26 +11,6 @@
 # inspired from YMX2
 # https://github.com/Gunstick/spriterecord/blob/master/ym2ymx.pl?fbclid=IwAR0N-YjwYHH_GAVuU3liUEq8frp_TxQIZuE0-myG1iu7PH3qVu_5mml8arY#L28
 # 
-# Each VBL we read a byte, if none of the top 3 bits is set, 
-# there is no frequency register to be modified.
-#   If a bit is set (7,6 or 5), we store the data into register 1,3 or 5
-#   and then copy the next byte into 0,2 or 4 respectively.
-#   If there's still another bit set (6 or 5) do the same again.
-#   This means if frequency A and C has to be modified, the first byte 
-#   will have top bits like 101. If it's B and C it will be 011 etc...
-# And finally if bit 4 is set, there's more data, else we have finished. 
-# BYTE: abcnxxxx   abc: bitfield for freq registers n: more data to follow
-# if a=1; xxxx->reg1; read BYTE->reg0; if n=1; read BYTE: 0bcnxxxx
-# if b=1; xxxx->reg3; read BYTE->reg2; if n=1; read BYTE: 00cnxxxx
-# if c=1; xxxx->reg5; read BYTE->reg4; 
-# if n=1; read BYTE: ABCNSFEn
-#                    ABC=volumes for channels a b and c
-#                       N=noise (reg6)
-#                        S=status (on/off channels)
-#                         F=envelope frequency
-#                          E=envelope form (reg13)
-#                           n=future extension (SID, DRUM)
-#
 # or do it volume centric
 # 111naAAA bBBBcCCC for the volumes
 # 011nbBBB cCCCxxxx if vol a is not used
@@ -65,34 +45,99 @@
 # 00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A  
 # 012345 7890123456 890123456789012345678901234567890123456789
 # 000000 0001111111 111222222222233333333334444444444555555555
+
+
+# YMX2 encoder
+# Each VBL we read a byte, if none of the top 3 bits is set, 
+# there is no frequency register to be modified.
+#   If a bit is set (7,6 or 5), we store the data into register 1,3 or 5
+#   and then copy the next byte into 0,2 or 4 respectively.
+#   If there's still another bit set (6 or 5) do the same again.
+#   This means if frequency A and C has to be modified, the first byte 
+#   will have top bits like 101. If it's B and C it will be 011 etc...
+# And finally if bit 4 is set, there's more data, else we have finished. 
+# BYTE: abcnxxxx   abc: bitfield for freq registers n: more data to follow
+# if a=1; xxxx->reg1; read BYTE->reg0; if n=1; read BYTE: 0bcnxxxx
+# if b=1; xxxx->reg3; read BYTE->reg2; if n=1; read BYTE: 00cnxxxx
+# if c=1; xxxx->reg5; read BYTE->reg4; 
+# if n=1; read BYTE: ABCNSFEn
+#                    ABC=volumes for channels a (reg  b and c 
+#                       N=noise (reg6)
+#                        M=mixer (on/off channels)
+#                         F=envelope frequency
+#                          S=envelope shape (reg13)
+#                           n=future extension (SID, DRUM)
+#
 prevregistervalues="00-00-00-00-00-00-00-00-00-00-00-00-00-00".split("-")
 
-dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
-vbltime=dumpline[0:6]
-ymtime=dumpline[7:17]
-registervalues=dumpline[18:59].split("-")
-for i in range(0,13):
-  if registervalues[i]==prevregistervalues[i]:
-    # no change
-    registervalues[i]=".."
-flags=0
-# check freq A
-if (registervalues[0]!=".." or registervalues[1]!=".."):
-  flags = flags | int('10000000',2)
-# check freq B
-if registervalues[2]!=".." or registervalues[3]!="..":
-  flags = flags | int('01000000',2)
-# check freq C
-if registervalues[4]!=".." or registervalues[5]!="..":
-  flags = flags | int('00100000',2)
-# we now have flags and register value.
-if flags & int('10000000',2):
-  print(hex(flags | int(registervalues[1],16)))
-  print(hex(int(registervalues[0],16)))  # dual conversion, to catch bad dump.
-if flags & int('01000000',2):
-  print(hex(flags | int(registervalues[3],16)))
-  print(hex(int(registervalues[2],16)))
-if flags & int('00100000',2):
-  print(hex(flags | int(registervalues[5],16)))   # note, if reg is not modified it will be ".." and cause an error here
-  print(hex(int(registervalues[4],16)))
+inputdump = open('lap27.dmp', 'r')
 
+dumpline=inputdump.readline()
+while dumpline:
+  #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
+  # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
+  print(      "vbl    time       freqA freqB freqC N  Mx vA vB cC freqE Sh")
+  print(dumpline)
+  vbltime=dumpline[0:6]
+  ymtime=dumpline[7:17]
+
+  registervalues=dumpline[18:59].split("-")
+  for i in range(0,13):
+    if registervalues[i]==prevregistervalues[i]:
+      # no change
+      registervalues[i]=".."
+  flags=0   # abcnxxxx
+  flags2=0  # ABCNMFSn
+  # check freq A
+  if (registervalues[0]!=".." or registervalues[1]!=".."):
+    flags = flags | int('10000000',2)
+  # check freq B
+  if registervalues[2]!=".." or registervalues[3]!="..":
+    flags = flags | int('01000000',2)
+  # check freq C
+  if registervalues[4]!=".." or registervalues[5]!="..":
+    flags = flags | int('00100000',2)
+  # frequencies done now care about other registers
+  if registervalues[6]!="..":              # noise frequency
+    flags2 = flags2 | int('00010000',2)    # ABC1MFSn
+  if registervalues[7]!="..":              # mixer
+    flags2 = flags2 | int('00001000',2)    # ABCN1FSn
+  if registervalues[8]!="..":              # vol A
+    flags2 = flags2 | int('10000000',2)    # 1BCNMFSn
+  if registervalues[9]!="..":              # vol B
+    flags2 = flags2 | int('01000000',2)    # A1CNMFSn
+  if registervalues[10]!="..":             # vol C
+    flags2 = flags2 | int('00100000',2)    # AB1NMFSn
+  if registervalues[11]!=".." or registervalues[12]!="..":             # envelope frequency
+    flags2 = flags2 | int('00000100',2)    # ABCNM1Sn
+  if registervalues[13]!="..":             # envelope shape
+    flags2 = flags2 | int('00000010',2)    # ABCNMF1n
+
+  if flags2!=0:
+    flags = flags | int('00010000',2)   # set abcnxxxx to abc1xxxx
+    
+  # we now have flags and register value.
+  print( '             abcnxxxx               ABCNMFSn')
+  print(f'flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ')
+  if flags & int('10000000',2):
+    if(registervalues[1]==".."):
+      print(hex(flags | int(prevregistervalues[1],16)))   # no change
+    else:
+      print(hex(flags | int(registervalues[1],16)))   # changed
+    print(hex(int(registervalues[0],16)))  # dual conversion, to catch bad dump.
+  if flags & int('01000000',2):
+    if(registervalues[3]==".."):
+      print(hex(flags | int(prevregistervalues[3],16)))   # no change
+    else:
+      print(hex(flags | int(registervalues[3],16)))   # changed
+    print(hex(int(registervalues[2],16)))
+  if flags & int('00100000',2):
+    if(registervalues[5]==".."):
+      print(hex(flags | int(prevregistervalues[5],16)))   # no change
+    else:
+      print(hex(flags | int(registervalues[5],16)))   # changed
+    print(hex(int(registervalues[4],16)))
+
+  dumpline=inputdump.readline()
+
+inputdump.close()
