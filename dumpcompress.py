@@ -68,18 +68,25 @@
 #                          S=envelope shape (reg13)
 #                           n=future extension (SID, DRUM)
 #
+import sys
 prevregistervalues="00-00-00-00-00-00-00-00-00-00-00-00-00-00".split("-")
 
-inputdump = open('lap27.dmp', 'r')
-
+inputdump = open(sys.argv[1], 'r')
+incount=0
+outcount=0
+prevymtime=0
 dumpline=inputdump.readline()
 while dumpline:
   #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
   # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
-  print(      "vbl    time       freqA freqB freqC N  Mx vA vB cC freqE Sh")
-  print(dumpline)
+  print(   "# vbl    time       freqA freqB freqC N  Mx vA vB cC freqE Sh")
+  print("# "+dumpline)
+  incount=incount+len(dumpline)
   vbltime=dumpline[0:6]
-  ymtime=dumpline[7:17]
+  ymtime=int(dumpline[7:17],16)
+  print(f"{ymtime}-{prevymtime}="+hex(ymtime-prevymtime))
+  prevymtime=ymtime
+  outcount=outcount+2    # timestamp on 2 bytes
 
   registervalues=dumpline[18:59].split("-")
   for i in range(0,13):
@@ -97,6 +104,7 @@ while dumpline:
   # check freq C
   if registervalues[4]!=".." or registervalues[5]!="..":
     flags = flags | int('00100000',2)
+
   # frequencies done now care about other registers
   if registervalues[6]!="..":              # noise frequency
     flags2 = flags2 | int('00010000',2)    # ABC1MFSn
@@ -117,27 +125,63 @@ while dumpline:
     flags = flags | int('00010000',2)   # set abcnxxxx to abc1xxxx
     
   # we now have flags and register value.
-  print( '             abcnxxxx               ABCNMFSn')
-  print(f'flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ')
+  print( '#              abcnxxxx               ABCNMFSn')
+  print(f'# flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ')
   if flags & int('10000000',2):
     if(registervalues[1]==".."):
       print(hex(flags | int(prevregistervalues[1],16)))   # no change
     else:
       print(hex(flags | int(registervalues[1],16)))   # changed
     print(hex(int(registervalues[0],16)))  # dual conversion, to catch bad dump.
+    outcount=outcount+2
   if flags & int('01000000',2):
     if(registervalues[3]==".."):
       print(hex(flags | int(prevregistervalues[3],16)))   # no change
     else:
       print(hex(flags | int(registervalues[3],16)))   # changed
     print(hex(int(registervalues[2],16)))
+    outcount=outcount+2
   if flags & int('00100000',2):
     if(registervalues[5]==".."):
       print(hex(flags | int(prevregistervalues[5],16)))   # no change
     else:
       print(hex(flags | int(registervalues[5],16)))   # changed
     print(hex(int(registervalues[4],16)))
-
+    outcount=outcount+2
+  if flags & int('00010000',2):     # extended data
+    outcount=outcount+1
+    if flags2 & int('10000000',2):
+      print(hex(int(registervalues[8],16)))
+      outcount=outcount+1
+    if flags2 & int('01000000',2):
+      print(hex(int(registervalues[9],16)))
+      outcount=outcount+1
+    if flags2 & int('00100000',2):
+      print(hex(int(registervalues[10],16)))
+      outcount=outcount+1
+    if flags2 & int('00010000',2):
+      print(hex(int(registervalues[6],16)))
+      outcount=outcount+1
+    if flags2 & int('00001000',2):
+      print(hex(int(registervalues[7],16)))
+      outcount=outcount+1
+    if flags2 & int('00000100',2):
+      if registervalues[11]=="..":
+        print(hex(int(prevregistervalues[11],16)))
+      else:
+        print(hex(int(registervalues[11],16)))
+      if registervalues[12]=="..":
+        print(hex(int(prevregistervalues[12],16)))
+      else:
+        print(hex(int(registervalues[12],16)))
+      outcount=outcount+2
+    if flags2 & int('00000010',2):
+      print(hex(int(registervalues[13],16)))
+      outcount=outcount+1
+  for i in range(0,13):
+    if registervalues[i]!="..":
+      prevregistervalues[i]=registervalues[i]
   dumpline=inputdump.readline()
 
 inputdump.close()
+print(f"read {incount} bytes, wrote {outcount} bytes")

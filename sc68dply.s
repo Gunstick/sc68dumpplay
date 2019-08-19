@@ -15,7 +15,6 @@ screen:
    move.b #1,$ffff8260.w      ; mid rez
    jsr print
    dc.b "sc68 dump player",10,13,0
-
    lea sc68dump,a6   ; start of ascii dump
 ; 00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A  
 ; 012345 7890123456 890123456789012345678901234567890123456789
@@ -23,11 +22,23 @@ screen:
 ; vbl
 playloop:
     lea (a6),a3
-    lea 59(a3),a4    ; do not take crlf
-    jsr a3printa4
-    jsr print        ; print only a cr to stay on same line
-    dc.b 13,0
+    ;lea 59(a3),a4    ; do not take crlf
+    lea 7(a3),a4    ; do not take crlf
+    ;jsr a3printa4
+    ;jsr print        ; print only a cr to stay on same line
+    ;dc.b 13,0
     ; let's see to play registers
+    lea 7(a6),a3     ; start of ym clock
+    bsr hexa3tod0
+    move.l d0,d3
+    sub.l prevclock,d3  ; difference
+    move.l d0,prevclock 
+    move.l d3,d0
+    sub.l #50,d3   ; nop length of the decoder routine
+    lsr.l #2,d3    ; some guesswork
+waitclock:
+    nop
+    dbf d3,waitclock  ; just delay a little
     adda.l #18,a6    ; this points now to R0
     moveq #0,d3
 regloop:      ; play all 13 values pointed to by a6
@@ -48,7 +59,7 @@ skipreg:
     lea 3(a6),a6    ; we read a - so we skip this register
     bra.s nextreg
 regloopend:
-    bsr waitvbl    ; function offered by ulm-init.s 
+    ;bsr waitvbl    ; function offered by ulm-init.s 
     cmpa.l #enddump,a6    ; are we at end of dump
     ble playloop
 
@@ -158,6 +169,29 @@ nextdeztohex:
 enddeztohex:
  movem.l (a7)+,a3/d1/d2
  rts
+hexa3tod0:
+ ;converts the hexadecimal chars a3 points to into d0.
+ ;a3 points to the MSDigit. End of conversion if illegal character
+ movem.l a3/d0/d1,-(sp)
+ moveq #0,d0       ; clear working register d0
+ moveq #0,d1
+nexthexa3tod0:
+ move.b (a3)+,d1   ; get a digit
+ subi.b #"0",d1    ; is it greater than 0
+ blo.s endhexa3tod0   ; if lower: bad char, i.e. space, stop here
+ cmpi.b #9,d1      ; less than 9 ?
+ ble.s _justdigit
+ subi.b #7,d1      ; go to chars...
+ cmpi.b #15,d1      ; less than 15?
+ bhi.s endhexa3tod0 ; bad char... end
+_justdigit
+ lsl.l #4,d0
+ add.l d1,d0
+ bra.s nexthexa3tod0
+endhexa3tod0:
+ movem.l (sp)+,a3/d1/d2
+ rts
+
 bind0tohexa6:
   ; converts d0 to 8 chars stating at a6
   movem.l d0/d1/d2/a6,-(sp)
@@ -192,7 +226,12 @@ hexstring:
   even
 
    data
+prevclock:
+   dc.l 0
 sc68dump:
   incbin "lap27.dmp"
+  ;incbin "bla.dmp"
+  ;incbin "breath.dmp"
+  ;incbin "sidtor.dmp"
 enddump:
   dc.b 0,0
