@@ -80,14 +80,18 @@ while dumpline:
   #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
   # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
   print(   "# vbl    time       freqA freqB freqC N  Mx vA vB cC freqE Sh")
-  print("# "+dumpline)
-  incount=incount+len(dumpline)
+  print("# "+dumpline, end='')
+  # calculate as incount an brute force register list with 2 byte flag which registers are changed
+  incount=incount+4    # ym time on 4 bytes
+  incount=incount+2    # the 2 bytes flag
+  incount=incount+len(dumpline[18:59].replace('.','').replace('-',''))/2   # the changed registers
   vbltime=dumpline[0:6]
   ymtime=int(dumpline[7:17],16)
-  print(f"{ymtime}-{prevymtime}="+hex(ymtime-prevymtime))
+  print(f"# {ymtime}-{prevymtime}=")
+  print(f'{(ymtime-prevymtime):04x}')
   prevymtime=ymtime
   outcount=outcount+2    # timestamp on 2 bytes
-
+  print(f'# o={outcount}')            # XXXX
   registervalues=dumpline[18:59].split("-")
   for i in range(0,13):
     if registervalues[i]==prevregistervalues[i]:
@@ -129,59 +133,75 @@ while dumpline:
   print(f'# flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ')
   if flags & int('10000000',2):
     if(registervalues[1]==".."):
-      print(hex(flags | int(prevregistervalues[1],16)))   # no change
+      print(f'{(flags | int(prevregistervalues[1],16)):02x}')   # no change
     else:
-      print(hex(flags | int(registervalues[1],16)))   # changed
-    print(hex(int(registervalues[0],16)))  # dual conversion, to catch bad dump.
+      print(f'{(flags | int(registervalues[1],16)):02x}')   # changed
+    print(f'{(int(registervalues[0],16)):02x}')  # dual conversion, to catch bad dump.
     outcount=outcount+2
+    print(f'# o={outcount}')            # XXXX
   if flags & int('01000000',2):
     if(registervalues[3]==".."):
-      print(hex(flags | int(prevregistervalues[3],16)))   # no change
+      print(f'{(flags | int(prevregistervalues[3],16)):02x}')   # no change
     else:
-      print(hex(flags | int(registervalues[3],16)))   # changed
-    print(hex(int(registervalues[2],16)))
+      print(f'{(flags | int(registervalues[3],16)):02x}')   # changed
+    print(f'{(int(registervalues[2],16)):02x}')
     outcount=outcount+2
+    print(f'# o={outcount}')            # XXXX
   if flags & int('00100000',2):
     if(registervalues[5]==".."):
-      print(hex(flags | int(prevregistervalues[5],16)))   # no change
+      print(f'{(flags | int(prevregistervalues[5],16)):02x}')   # no change
     else:
-      print(hex(flags | int(registervalues[5],16)))   # changed
-    print(hex(int(registervalues[4],16)))
+      print(f'{(flags | int(registervalues[5],16)):02x}')   # changed
+    print(f'{(int(registervalues[4],16)):02x}')
     outcount=outcount+2
-  if flags & int('00010000',2):     # extended data
+    print(f'# o={outcount}')            # XXXX
+  if not (flags & int('11100000',2)):     # no freq registers
+    print(f'{flags:02x}')           # output empty flags
     outcount=outcount+1
+    print(f'# o={outcount}')            # XXXX
+  if flags & int('00010000',2):     # extended data
+    print(f'{flags2:02x}')          # output extended flags
+    outcount=outcount+1
+    print(f'# o={outcount}')            # XXXX
     if flags2 & int('10000000',2):
-      print(hex(int(registervalues[8],16)))
+      print(f'{(int(registervalues[8],16)):02x}')
       outcount=outcount+1
+      print(f'# o={outcount}')            # XXXX
     if flags2 & int('01000000',2):
-      print(hex(int(registervalues[9],16)))
+      print(f'{(int(registervalues[9],16)):02x}')
       outcount=outcount+1
+      print(f'# o={outcount}')            # XXXX
     if flags2 & int('00100000',2):
-      print(hex(int(registervalues[10],16)))
+      print(f'{(int(registervalues[10],16)):02x}')
       outcount=outcount+1
+      print(f'# o={outcount}')            # XXXX
     if flags2 & int('00010000',2):
-      print(hex(int(registervalues[6],16)))
+      print(f'{(int(registervalues[6],16)):02x}')
       outcount=outcount+1
+      print(f'# o={outcount}')            # XXXX
     if flags2 & int('00001000',2):
-      print(hex(int(registervalues[7],16)))
+      print(f'{(int(registervalues[7],16)):02x}')
       outcount=outcount+1
+      print(f'# o={outcount}')            # XXXX
     if flags2 & int('00000100',2):
       if registervalues[11]=="..":
-        print(hex(int(prevregistervalues[11],16)))
+        print(f'{(int(prevregistervalues[11],16)):02x}')
       else:
-        print(hex(int(registervalues[11],16)))
+        print(f'{(int(registervalues[11],16)):02x}')
       if registervalues[12]=="..":
-        print(hex(int(prevregistervalues[12],16)))
+        print(f'{(int(prevregistervalues[12],16)):02x}')
       else:
-        print(hex(int(registervalues[12],16)))
+        print(f'{(int(registervalues[12],16)):02x}')
       outcount=outcount+2
+      print(f'# o={outcount}')            # XXXX
     if flags2 & int('00000010',2):
-      print(hex(int(registervalues[13],16)))
+      print(f'{(int(registervalues[13],16)):02x}')
       outcount=outcount+1
+      print(f'# o={outcount}')            # XXXX
   for i in range(0,13):
     if registervalues[i]!="..":
       prevregistervalues[i]=registervalues[i]
   dumpline=inputdump.readline()
 
 inputdump.close()
-print(f"read {incount} bytes, wrote {outcount} bytes")
+print(f"#read {incount} bytes, wrote {outcount} bytes, for {ymtime/40064/50:.2f} s")
