@@ -86,27 +86,14 @@ def ymx2encode():
   #
   prevregistervalues="00-00-00-00-00-00-00-00-00-00-00-00-00-00".split("-")
 
-  inputdump = open(sys.argv[2], 'r')
-  incount=0
-  outcount=0
+  inputdump = opendump(sys.argv[2])
   prevymtime=0
-  dumpline=inputdump.readline()
+  dumpline=readdump(inputdump)
   while dumpline:
-    #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
-    # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
-    print(   "# vbl    time       freqA freqB freqC N  Mx vA vB cC freqE Sh")
-    print("# "+dumpline, end='')
-    # calculate as incount an brute force register list with 2 byte flag which registers are changed
-    incount=incount+4    # ym time on 4 bytes
-    incount=incount+2    # the 2 bytes flag
-    incount=incount+len(dumpline[18:59].replace('.','').replace('-',''))/2   # the changed registers
     vbltime=dumpline[0:6]
     ymtime=int(dumpline[7:17],16)
-    print(f"# {ymtime}-{prevymtime}=")
-    print(f'{(ymtime-prevymtime):04x}')
+    writedump(inputdump,ymtime-prevymtime,4,f"{ymtime}-{prevymtime}=")
     prevymtime=ymtime
-    outcount=outcount+2    # timestamp on 2 bytes
-    print(f'# o={outcount}')            # XXXX
     registervalues=dumpline[18:59].split("-")
     for i in range(0,13):
       if registervalues[i]==prevregistervalues[i]:
@@ -148,78 +135,53 @@ def ymx2encode():
     print(f'# flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ')
     if flags & int('10000000',2):
       if(registervalues[1]==".."):
-        print(f'{(flags | int(prevregistervalues[1],16)):02x}')   # no change
+        writedump(inputdump,flags | int(prevregistervalues[1],16),1,"")
       else:
-        print(f'{(flags | int(registervalues[1],16)):02x}')   # changed
-      print(f'{(int(registervalues[0],16)):02x}')  # dual conversion, to catch bad dump.
-      outcount=outcount+2
-      print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,flags | int(registervalues[1],16),1,"")
+      writedump(inputdump,int(registervalues[0],16),1,"")
     if flags & int('01000000',2):
       if(registervalues[3]==".."):
-        print(f'{(flags | int(prevregistervalues[3],16)):02x}')   # no change
+        writedump(inputdump,flags | int(prevregistervalues[3],16),1,"")
       else:
-        print(f'{(flags | int(registervalues[3],16)):02x}')   # changed
-      print(f'{(int(registervalues[2],16)):02x}')
-      outcount=outcount+2
-      print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,flags | int(registervalues[3],16),1,"")
+      writedump(inputdump,int(registervalues[2],16),1,"")
     if flags & int('00100000',2):
       if(registervalues[5]==".."):
-        print(f'{(flags | int(prevregistervalues[5],16)):02x}')   # no change
+        writedump(inputdump,flags | int(prevregistervalues[5],16),1,"")
       else:
-        print(f'{(flags | int(registervalues[5],16)):02x}')   # changed
-      print(f'{(int(registervalues[4],16)):02x}')
-      outcount=outcount+2
-      print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,flags | int(registervalues[5],16),1,"")
+      writedump(inputdump,int(registervalues[4],16),1,"")
     if not (flags & int('11100000',2)):     # no freq registers
-      print(f'{flags:02x}')           # output empty flags
-      outcount=outcount+1
-      print(f'# o={outcount}')            # XXXX
+      writedump(inputdump,flags,1,"")
     if flags & int('00010000',2):     # extended data
-      print(f'{flags2:02x}')          # output extended flags
-      outcount=outcount+1
-      print(f'# o={outcount}')            # XXXX
+      writedump(inputdump,flags2,1,"")
       if flags2 & int('10000000',2):
-        print(f'{(int(registervalues[8],16)):02x}')
-        outcount=outcount+1
-        print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,int(registervalues[8],16),1,"")
       if flags2 & int('01000000',2):
-        print(f'{(int(registervalues[9],16)):02x}')
-        outcount=outcount+1
-        print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,int(registervalues[9],16),1,"")
       if flags2 & int('00100000',2):
-        print(f'{(int(registervalues[10],16)):02x}')
-        outcount=outcount+1
-        print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,int(registervalues[10],16),1,"")
       if flags2 & int('00010000',2):
-        print(f'{(int(registervalues[6],16)):02x}')
-        outcount=outcount+1
-        print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,int(registervalues[6],16),1,"")
       if flags2 & int('00001000',2):
-        print(f'{(int(registervalues[7],16)):02x}')
-        outcount=outcount+1
-        print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,int(registervalues[7],16),1,"")
       if flags2 & int('00000100',2):
         if registervalues[11]=="..":
-          print(f'{(int(prevregistervalues[11],16)):02x}')
+          writedump(inputdump,int(prevregistervalues[11],16),1,"")
         else:
-          print(f'{(int(registervalues[11],16)):02x}')
+          writedump(inputdump,int(registervalues[11],16),1,"")
         if registervalues[12]=="..":
-          print(f'{(int(prevregistervalues[12],16)):02x}')
+          writedump(inputdump,int(prevregistervalues[12],16),1,"")
         else:
-          print(f'{(int(registervalues[12],16)):02x}')
-        outcount=outcount+2
-        print(f'# o={outcount}')            # XXXX
+          writedump(inputdump,int(registervalues[12],16),1,"")
       if flags2 & int('00000010',2):
-        print(f'{(int(registervalues[13],16)):02x}')
-        outcount=outcount+1
-        print(f'# o={outcount}')            # XXXX
+        writedump(inputdump,int(registervalues[13],16),1,"")
     for i in range(0,13):
       if registervalues[i]!="..":
         prevregistervalues[i]=registervalues[i]
-    dumpline=inputdump.readline()
+    dumpline=readdump(inputdump)
 
-  inputdump.close()
-  print(f"#read {incount} bytes, wrote {outcount} bytes, for {ymtime/40064/50:.2f} s")
+  closedump(inputdump,ymtime)
 
 
 def ympkst():
@@ -250,74 +212,141 @@ def ympkst():
   # Binary Packet coding
   # --------------------
   #
-  # byte-0     | byte-1    | description
-  # ---------- | --------- | -----------
-  # 00 DCBA98  | 76543210  | a bit set means named register is present
-  # 01 xxxxxx  |           | reserved
-  # 10 00 8888 |           | #8:={8888}
-  # 10 010000  |           | #8:=16
-  # 10 010xxx  |           | reserved
-  # 10 011 DDD |           | #8:=16 and #D:={1DDD}
-  # 10 1xxxxx  |           | same as 100xxxxx with #9
-  # 11 0xxxxx  |           | same as 100xxxxx with #A
-  # 11 10 8888 | 9999 AAAA | #8:={8888},  #9:={9999}, #A:={AAAA}
-  # 11 11 XXXX | YYYYYYYY  | #X:={YYYYYYYY}
-  # 11 111110  | YYYYYYYY  | reserved (could be STE channel mix L^R)
-  # 11 111111  | YYYYYYYY  | reserved (could be STE channel mix R)
+  # byte-0    | byte-1    | description
+  # --------- | --------- | -----------
+  # 00DCBA98  | 76543210  | a bit set means named register is present (followed by all bytes starting at R0)
+  # 01xxxxxx  |           | reserved    (timer values perhaps?)
+  # 1rr.....  |           | quick set for volume register R(8+0brr)   00 <= rr <= 10
+  # 1rr0nnnn  |           | Rr:={0nnnn}     rr=00 => Rr = R8, 01 => R9, 10 => R10
+  # 1rr10000  |           | Rr:=0x10    = use envelope
+  # 1rr10xxx  |           | reserved
+  # 1rr11DDD  |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
+  #### if rr==0b11
+  # 11108888  | 9999AAAA  | R8:={8888},  R9:={9999}, R10:={AAAA}  i.e. for digi sound
+  # 1111XXXX  | YYYYYYYY  | RX:={YYYYYYYY}    i.e. for R7 (mixer)
+  # 11111110  | YYYYYYYY  | reserved (could be STE channel mix L^R)
+  # 11111111  | YYYYYYYY  | reserved (could be STE channel mix R)
+  ####per register example:
+  # 1000nnnn  |           | R8:={nnnn}
+  # 10010000  |           | R8:=0x10
+  # 10010xxx  |           | reserved
+  # 10011DDD  |           | R8:=0x10 and R13:={1DDD}
+  # 1010nnnn  |           | R9:={nnnn}
+  # 10110000  |           | R9:=0x10
+  # 10110xxx  |           | reserved
+  # 10111DDD  |           | R9:=0x10 and R13:={1DDD}
+  # 1100nnnn  |           | R10:={nnnn}
+  # 11010000  |           | R10:=0x10
+  # 11010xxx  |           | reserved
+  # 11011DDD  |           | R10:=0x10 and R13:={1DDD}
+
+  # note: as a 00 frame is followed by each register value as a byte, and a volume only change is also
+  # only taking 1 byte, it is same size to use it in a 00 frame bitfield or use a 1rr frame.
+  # so the 3 volume registers and shape regiser are not needed in the 00 frame. => 4 bits for other use.
+  # 00xCBxxx  | 76543210  | 
+  # proposal (incompatible => YMPKST11):
+  # 00543210  | 00000000 xxxx1111 22222222 xxxx3333 44444444 xxxx5555  freq regs
+  # 01xxCB76  | xxx66666 xx777777 BBBBBBBB CCCCCCCC   to set noise, mixer and  envelope frequency
+
   ympkstmagic="YMPKST"
   ympkstversion=1
   ympkstflags=0
-  print("# "+ympkstmagic)  # magic string
-  print(''.join(str(ord(c)) for c in ympkstmagic))
-  print(f"# v={ympkstversion} flags={ympkstflags}")      # version , flags
-  print(f'{ympkstversion+0x30:02x}{ympkstflags+0x30:02x}')           # each one byte char
-  print(f'{2000000:08x}') # clock (hz) big endian uint32
-  print(f'{0:08x}')      # data size big endian uint32 (0 if unknown)
+  inputdump = opendump(sys.argv[2])
+  writedump(inputdump,''.join(str(ord(c)) for c in ympkstmagic),-1,ympkstmagic)
+  #print("# "+ympkstmagic)  # magic string
+  #print(''.join(str(ord(c)) for c in ympkstmagic))
+  #print(f"# v={ympkstversion} flags={ympkstflags}")      # version , flags
+  #print(f'{ympkstversion+0x30:02x}{ympkstflags+0x30:02x}')           # each one byte char
+  writedump(inputdump,f'{ympkstversion+0x30:02x}{ympkstflags+0x30:02x}',-1,f"# v={ympkstversion} flags={ympkstflags}")
+  
+  writedump(inputdump,2000000,4,"clock 2Mhz on big endian uint32")   # YM on ST is 2MHz
+  writedump(inputdump,0,4,"data size big endian uint32 (0 if unknown)")
 
   prevregistervalues="00-00-00-00-00-00-00-00-00-00-00-00-00-00".split("-")
 
-  inputdump = open(sys.argv[2], 'r')
-  incount=0
-  outcount=0
   prevymtime=0
-  dumpline=inputdump.readline()
+  flags=0
+  dumpline=readdump(inputdump)
   while dumpline:
     #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
     # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
-    print(   "# vbl    time       freqA freqB freqC N  Mx vA vB cC freqE Sh")
-    print("# "+dumpline, end='')
-    # calculate as incount an brute force register list with 2 byte flag which registers are changed
-    incount=incount+4    # ym time on 4 bytes
-    incount=incount+2    # the 2 bytes flag
-    incount=incount+len(dumpline[18:59].replace('.','').replace('-',''))/2   # the changed registers
     vbltime=dumpline[0:6]
     ymtime=int(dumpline[7:17],16)
-    print(f"# {ymtime}-{prevymtime}={(ymtime-prevymtime):08x}")
-    print(ympkstcycles(ymtime-prevymtime))
+    writedump(inputdump,ympkstcycles(ymtime-prevymtime),-1,f'{ymtime}-{prevymtime}={(ymtime-prevymtime):08x}') 
     prevymtime=ymtime
-    outcount=outcount+2    # timestamp on 2 bytes
-    print(f'# o={outcount}')            # XXXX
     registervalues=dumpline[18:59].split("-")
-    for i in range(0,13):
+    if registervalues[13] != "..":
+      shape=int(registervalues[13],16)
+      if shape<8:    # if lower shape, convert it to upper
+        if shape<4:
+          shape=9
+        else:
+          shape=15
+    else:
+      shape=0
+      
+    # optimize registers
+    for i in range(0,13):    # end of range (i.e. shape) not included
       if registervalues[i]==prevregistervalues[i]:
         # no change
         registervalues[i]=".."
 
-    dumpline=inputdump.readline()
+    # create bit pattern of present registers
+    for i in range(13,-1,-1):    # end of range not included
+      if registervalues[i]=="..":
+        # shift in 0
+        flags=(flags<<1)+0
+      else:
+        # shift in 1 
+        flags=(flags<<1)+1
+    # we now have a bitfield with a 1 for every register if it's present
+    # need to decide which method to use for encoding
+    # check if only 1 volume is changed => 1 byte
+    if flags & 1<<8:     # is R8 set?
+      writedump(inputdump,0b10000000 | int(registervalues[8],16) | shape,1,'volA')
+      flags=flags & ~(1<<8)
+    if flags & 1<<9:     # is R9 set?
+      writedump(inputdump,0b10100000 | int(registervalues[9],16) | shape,1,'volB')
+      flags=flags & ~(1<<9)
+    if flags & 1<<10:    # is R10 set?
+      writedump(inputdump,0b11000000 | int(registervalues[10],16) | shape,1,'volC')
+      flags=flags & ~(1<<10)
+       
 
-  inputdump.close()
-  print(f"#read {incount} bytes, wrote {outcount} bytes, for {ymtime/40064/50:.2f} s")
+    # other methods:
+
+    # test if volumes ABC are set together<0x10, write 111088889999AAAA frame (usually sound sample) 2 bytes
+    # could bit test, but still needs to test regs directly, so just do that
+
+    # if there are single registers to write, do it with a 1111XXXXYYYYYYYY frame (2 bytes)
+
+    # if nothing works, just use the simple dumb way: just wite it all out (2 bytes + number of registers)
+    if flags != 0:   # still registers left?
+      print(                     "#       00DCBA9876543210")
+      writedump(inputdump,flags,2,f'flags={flags:016b}')
+      for i in range(0,14):    # end of range not included
+        if 1<<i & flags:
+          writedump(inputdump,registervalues[i],1,f'R{i} present.')
+
+    # save current values as previous YM state
+    for i in range(0,13):
+      if registervalues[i]!="..":
+        prevregistervalues[i]=registervalues[i]
+    flags=0
+    dumpline=readdump(inputdump)
+
+  closedump(inputdump,ymtime)
 
 
 def ympkstcycles(ticks):
   # input is an integer
   # returns as hex string the variable length unsigned integer big endian
-  # ympkstcycles(0)     =>     0
-  # ympkstcycles(127)   =>    7f
-  # ympkstcycles(128)   =>  8100    81 => top bit set. take 01<<7 plus next byte
-  # ympkstcycles(16383) =>  ff7f    ff => top bit set. Take 7f<<7 plus next byte 7f
-  # ympkstcycles(16384) =>818000    ((0x81 & 0x7f) <<14) + ((0x80 & 0x7f) <<7) + 0x00
-  # ympkstcycles(1234567) => cbad07 ((0xcb & 0x7f) <<14) + ((0xad & 0x7f) <<7) + 0x07
+  # ympkstcycles(0)     =>   "00"
+  # ympkstcycles(127)   =>   "7f"
+  # ympkstcycles(128)   =>  "8100"    81 => top bit set. take 01<<7 plus next byte
+  # ympkstcycles(16383) =>  "ff7f"    ff => top bit set. Take 7f<<7 plus next byte 7f
+  # ympkstcycles(16384) =>"818000"    ((0x81 & 0x7f) <<14) + ((0x80 & 0x7f) <<7) + 0x00
+  # ympkstcycles(1234567) => "cbad07" ((0xcb & 0x7f) <<14) + ((0xad & 0x7f) <<7) + 0x07
   # big endian is the beloved mc68000 format. not the intel mess
   ticksout=[]    # empty stack
   moreticks=0
@@ -337,7 +366,43 @@ def ympkstcycles(ticks):
     ticksout.append(0)
   return "".join(f'{e:02x}' for e in ticksout)
   
+def opendump(fname):   # future: return opject with opened in and multiple out files (ascii, binary)
+   # welcome to python: dicts are initiated withh {} but indexed with []
+   return {
+     "infd": open(fname, 'r'),    # reading file
+     "outcount": 0,               # counts effective number of bytes written
+     "incount" : 0               # counts each time bytes are written
+   }
 
+def readdump(fd):    
+  # uuh, nasty a read function with outputs stuff?
+  # this should go in future into a debugging parameter
+  #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
+  # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
+  dumpline=fd["infd"].readline()
+  # calculate as incount an brute force register list with 2 byte flag which registers are changed
+  fd["incount"]=fd["incount"]+4    # ym time on 4 bytes
+  fd["incount"]=fd["incount"]+2    # the 2 bytes flag
+  fd["incount"]=fd["incount"]+len(dumpline[18:59].replace('.','').replace('-',''))/2   # the changed registers
+  print(   "# vbl    time       freqA freqB freqC N  Mx vA vB vC freqE Sh")
+  print("# "+dumpline, end='')
+  return dumpline   
+
+def writedump(fd,value,length,comment):     # fd not used yet
+  # if length=-1, use the length of value (only works for hex string)
+  if length==-1:
+    length=int(len(value)/2)    # will make an error if not a string
+  if comment != "":
+    print(f'# {comment} v={value} l={length}')
+  try: 
+    print(f'{value:0{length*2}x}')   # print hex if it's an integer
+  except ValueError:
+    print(f'{value:0>{length*2}}')    # print as string
+  fd["outcount"]=fd["outcount"]+length
+
+def closedump(fd,ymt):
+  fd["infd"].close()
+  print(f'#read {fd["incount"]} bytes, wrote {fd["outcount"]} bytes, for {ymt/40064/50:.2f} s')
 # welcome to python
 if __name__=="__main__":
    main()
