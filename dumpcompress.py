@@ -241,12 +241,21 @@ def ympkst():
   # 11011DDD  |           | R10:=0x10 and R13:={1DDD}
 
   # note: as a 00 frame is followed by each register value as a byte, and a volume only change is also
-  # only taking 1 byte, it is same size to use it in a 00 frame bitfield or use a 1rr frame.
+  # taking 2 bytes (needs each time to have a clock header), if an update changes 2 vol registers, the size requirement
+  # is for a 00 frame: 2bytes for the bitfield + 2 bytes for the volumes. => 4 bytes
+  # and using 2 1rr frames: 1 byte for vol1 and 1 byte for 00 clock and 1 byte for vol2 => 4 bytes
+  # So even if 2 volumes are changed, it is same size to use it a 00 frame bitfield or use two 1rr frames.
+  # if 3 volumes are changed, use the 1110 frame (2 bytes instead of 5) and 00 clock + 1 byte for which voice has envelope
+  # as envelope is mostly only on 1 channel, what about 01ee8888 9999AAAA where ee says which voice has env. 00=none
+  # 01108888 1DDDAAAA sets R8=08888 R9=10000 R10=0AAAA R13=1DDD   (ee=10 => envelope on R9)
+  # 01118888 99990xxx sets R8=08888 R9=09999 R10=10000    (ee=11, envelope on R10, not set R13)
+  # 01008888 0000AAAA sets R8=08888 R9=09999 R10=0AAAA  only simply set volume (i.e. for digi sound)
+  # which renders 1110.... useless and can be used as below
   # so the 3 volume registers and shape regiser are not needed in the 00 frame. => 4 bits for other use.
-  # 00xCBxxx  | 76543210  | 
-  # proposal (incompatible => YMPKST11):
+  # 00xCBxxx  | 76543210  |    <= this was the old 00 frame, with the useless bits x-ed out
+  # so in YMPKST11 we have 2 bitfield frames of 1 byte:
   # 00543210  | 00000000 xxxx1111 22222222 xxxx3333 44444444 xxxx5555  freq regs
-  # 01xxCB76  | xxx66666 xx777777 BBBBBBBB CCCCCCCC   to set noise, mixer and  envelope frequency
+  # 1110CB76  | xxx66666 xx777777 BBBBBBBB CCCCCCCC   to set noise, mixer and  envelope frequency
 
   ympkstmagic="YMPKST"
   ympkstversion=1
@@ -262,18 +271,19 @@ def ympkst():
   writedump(inputdump,2000000,4,"clock 2Mhz on big endian uint32")   # YM on ST is 2MHz
   writedump(inputdump,0,4,"data size big endian uint32 (0 if unknown)")
 
-  prevregistervalues="00-00-00-00-00-00-00-00-00-00-00-00-00-00".split("-")
+  prevregistervalues="..-..-..-..-..-..-..-..-..-..-..-..-..-..".split("-")
 
   prevymtime=0
   flags=0
-  dumpline=readdump(inputdump)
+  dumpline="x"   # to enter the loop
   while dumpline:
+    dumpline=readdump(inputdump)
+    if not(dumpline):
+      break
     #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
     # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
     vbltime=dumpline[0:6]
     ymtime=int(dumpline[7:17],16)
-    writedump(inputdump,ympkstcycles(ymtime-prevymtime),-1,f'{ymtime}-{prevymtime}={(ymtime-prevymtime):08x}') 
-    prevymtime=ymtime
     registervalues=dumpline[18:59].split("-")
     if registervalues[13] != "..":
       shape=int(registervalues[13],16)
@@ -300,21 +310,52 @@ def ympkst():
         # shift in 1 
         flags=(flags<<1)+1
     # we now have a bitfield with a 1 for every register if it's present
+    # if nothing is changed, read the next line, without outputting
+    if flags == 0:
+      continue
+
+    writedump(inputdump,ympkstcycles(ymtime-prevymtime),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x}') 
+    prevymtime=ymtime
     # need to decide which method to use for encoding
+    # check if only shap register written
+    if flags == 1<<13:    # only bit for R13 is set
+      # check on which channel is the envelope applied, and use that one for setting shape
+      # frame looks like 1rr11DDD   rr=00 => 00 = R8, 01 => R9, 10 => R10
+      for i in range(8,11):    # test the 3 registers
+        if int(prevregistervalues[i],16) > 15:
+          break
+      if int(prevregistervalues[i],16) > 15:   # we effectively found a register
+        i=(i-8)<<5 # convert it to rr
+        #                     1rr11DDD |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
+        writedump(inputdump,0b10011000 | i | shape, 1 , f'R{i+8} shape {shape:04b}')
+        flags=flags & ~(1<<13)
+        
     # check if only 1 volume is changed => 1 byte
-    if flags & 1<<8:     # is R8 set?
+    if flags == 1<<8:     # is R8 set?
       writedump(inputdump,0b10000000 | int(registervalues[8],16) | shape,1,'volA')
       flags=flags & ~(1<<8)
-    if flags & 1<<9:     # is R9 set?
+    if flags == 1<<9:     # is R9 set?
       writedump(inputdump,0b10100000 | int(registervalues[9],16) | shape,1,'volB')
       flags=flags & ~(1<<9)
-    if flags & 1<<10:    # is R10 set?
+    if flags == 1<<10:    # is R10 set?
       writedump(inputdump,0b11000000 | int(registervalues[10],16) | shape,1,'volC')
       flags=flags & ~(1<<10)
        
 
     # other methods:
-
+ 
+    # check if exactly 1 bit remains set, then use   1111XXXX  | YYYYYYYY
+    # https://stackoverflow.com/questions/51094594/how-to-check-if-exactly-one-bit-is-set-in-an-int
+    if flags and not(flags & (flags-1)):
+      # so it's a power of 2, which register is that?
+      reg=0
+      i=1
+      while ((i & flags) == 0):
+        i = i << 1
+        reg += 1
+      writedump(inputdump,((0b11110000 | reg)<<8) + int(registervalues[reg],16),2,f'single register set is {reg} to value {registervalues[reg]}')
+      flags = flags & ~(1<<reg)
+ 
     # test if volumes ABC are set together<0x10, write 111088889999AAAA frame (usually sound sample) 2 bytes
     # could bit test, but still needs to test regs directly, so just do that
 
@@ -333,7 +374,6 @@ def ympkst():
       if registervalues[i]!="..":
         prevregistervalues[i]=registervalues[i]
     flags=0
-    dumpline=readdump(inputdump)
 
   closedump(inputdump,ymtime)
 
@@ -402,7 +442,7 @@ def writedump(fd,value,length,comment):     # fd not used yet
 
 def closedump(fd,ymt):
   fd["infd"].close()
-  print(f'#read {fd["incount"]} bytes, wrote {fd["outcount"]} bytes, for {ymt/40064/50:.2f} s')
+  print(f'#read {fd["incount"]} bytes, wrote {fd["outcount"]} bytes ({(1-fd["outcount"]/fd["incount"])*100:.2f}%), for {ymt/40064/50:.2f} s = {fd["outcount"]/(ymt/40064/50):.2f} bytes/s')
 # welcome to python
 if __name__=="__main__":
    main()

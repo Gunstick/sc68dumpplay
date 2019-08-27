@@ -35,12 +35,12 @@ BEGIN {
  lines++
 }
 END{
-  print lines " lines"
-  print "Frequencies:"
+  print lines " lines" > "/dev/stderr"
+  print "Frequencies:" > "/dev/stderr"
   for (i=1;i<=14;i++) {
-    printf "R" i-1 "=" count[i] "x " 
+    printf "R" i-1 "=" count[i] "x " > "/dev/stderr"
     writes+=count[i]
   }
-  print ""
-  print "Total register writes:" writes
+  print "" > "/dev/stderr"
+  print "Total register writes:" writes > "/dev/stderr"
 }
