@@ -90,6 +90,7 @@ endef
 
 $(eval $(call target_tpl,ymplay,prg,ymplay ymdump gemdos aes_fsel))
 $(eval $(call target_tpl,testcli,ttp,testcli))
+$(eval $(call target_tpl,testdmp,tos,ymdump))
 
 objects := $(sort $(foreach n,$(programs),$(value $n_objs)))
 depends := $(sort $(foreach n,$(programs),$(value $n_deps)))
@@ -98,7 +99,8 @@ targets := $(foreach n,$(programs),$(value $n_prg))
 all: $(targets)
 
 $(ymplay_prg): DEFS+=-DTOS=1
-$(call objnames,ymplay): INCS = -I$(srcdir)
+$(call objnames,ymdump): DEFS += -DTESTDUMP=1
+$(call objnames,ymplay): INCS += -I$(srcdir)
 clean: ; rm -f $(targets) $(objects) $(depends)
 .PHONY: all clean
 

@@ -19,12 +19,20 @@
 ;;; | ...... .......... FF-0F-FF-0F-FF-0F-..-..-0D-..-..-..-..-.. |
 ;;; +-------------------------------------------------------------+
 ;;;
-
+	
 	Include	"ymdump.i"
 
-	IfEQ	1
+	IfD	TESTDUMP
 	;; -------------------------------------
-main:
+	
+	Include	"start.i"
+	Include	"gemdos.i"
+	
+	STARTUP	main,(a7)
+main:	SUPEREXEC	superrout
+	rts
+
+superrout:	
 	bclr	#0,$484.w		;
 	move.l	$4ba.w,hz200
 	lea	ymstat,a0
@@ -95,8 +103,16 @@ I:	SET	I+1
 
 	rts
 
+hz200:	ds.l	1
+ymstat:	ymdmp_DS
+	
+line:	incbin	"lap27.dmp"
+eof:	
+	even
+
+	
 	;; -------------------------------------
- 	EndC ; NE 0
+ 	EndC ; DEFINED(TESTDUMP)
 
 ymdmp_next:
 	moveq	#32,d0
@@ -145,7 +161,7 @@ ymdmp_decode:
 	move.b	-48(a2,d0.w),d2	; d2= $xxBB
 	and.w	d7,d2		; d2= $000B
 	or.w	d2,d1		; d1= $00AB
-	move.w	d1,(a0)+		;* ymdmp_clk[2]
+	move.w	d1,(a0)+		; * ymdmp_clk
 
 	Rept	2
 	;; ------------------------------------
@@ -156,17 +172,18 @@ ymdmp_decode:
 	move.b	-48(a2,d0.w),d2	; d2= $xxBB
 	and.w	d7,d2		; d2= $000B
 	or.w	d2,d1		; d1= $00AB
-	move.b	d1,-(a7)		; LSL #8
-	move.w	(a7)+,d3		; d3= $ABxx
+	move.b	d3,(a0)+		; * ymdmp_clk
 	;;
+
+	
 	move.b	(a1)+,d0		; d0= clock[5/1]
-	move.b	-48(a2,d0.w),d3	; d3= $ABCC
-	and.b	d6,d3		; d3= $ABC0
+	move.b	-48(a2,d0.w),d3	; d3= $CC
+	and.b	d6,d3		; d3= $C0
 	move.b	(a1)+,d0		; d0= clock[4/0]
-	move.b	-48(a2,d0.w),d2	; d2= $xxDD
-	and.w	d7,d2		; d2= $000D
-	or.b	d2,d3		; d3= $ABCD
-	move.w	d3,(a0)+		; * ymdmp_clk[1/0]
+	move.b	-48(a2,d0.w),d2	; d2= $DD
+	and.w	d7,d2		; d2= $0D
+	or.b	d2,d3		; d3= $CD
+	move.b	d3,(a0)+		; * ymdmp_clk
 	;; ------------------------------------
 	EndR
 

@@ -20,6 +20,10 @@ ymdmp_SIZ:	rs.w	0
 
 	EndC ; YMDUMP_I
 
+ymdmp_DS:	Macro
+	ds.b	ymdmp_SIZ
+	EndM
+	
 ;;; Local Variables:
 ;;; mode: asm
 ;;; indent-tabs-mode: t
