@@ -133,7 +133,7 @@ SUPEREXEC:	Macro ; \1:addr.l
 	pea	\1		; routine address
 	move.w	#$26,-(a7)		; opcode
 	trap	#14		; Xbios
-	addq.w	#2,a7		; stack adjust
+	addq.w	#6,a7		; stack adjust
 	;; ------------------------------------
 	EndM
 
