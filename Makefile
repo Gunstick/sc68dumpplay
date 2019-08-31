@@ -9,6 +9,7 @@
 
 srcdir := $(dir $(lastword $(MAKEFILE_LIST)))
 
+.DELETE_ON_ERROR:
 .SUFFIXES:
 .SUFFIXES: .d .s .i .o .tos .ttp .prg
 .DEFAULT_GOAL := all
@@ -90,7 +91,7 @@ endef
 
 $(eval $(call target_tpl,ymplay,prg,ymplay ymdump gemdos aes_fsel))
 $(eval $(call target_tpl,testcli,ttp,testcli))
-$(eval $(call target_tpl,testdmp,tos,ymdump))
+$(eval $(call target_tpl,testdmp,tos,testdmp ymdump))
 
 objects := $(sort $(foreach n,$(programs),$(value $n_objs)))
 depends := $(sort $(foreach n,$(programs),$(value $n_deps)))
@@ -98,9 +99,9 @@ targets := $(foreach n,$(programs),$(value $n_prg))
 
 all: $(targets)
 
-$(ymplay_prg): DEFS+=-DTOS=1
-$(call objnames,ymdump): DEFS += -DTESTDUMP=1
-$(call objnames,ymplay): INCS += -I$(srcdir)
+$(testdmp_prg): INCS = -I$(srcdir)
+
+#$(call objnames,testdmp): 
 clean: ; rm -f $(targets) $(objects) $(depends)
 .PHONY: all clean
 
