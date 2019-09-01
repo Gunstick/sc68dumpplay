@@ -1,13 +1,13 @@
-;;; @file   gemdos.i
-;;; @date   2019-08-24
-;;; @author Ben/OVR
-;;; @brief  Some Atari ST Gemdos/Xbios/Bios macros
+;;; @file    gemdos.i
+;;; @date    2019-08-24
+;;; @author  Ben/OVR
+;;; @brief   Some Atari ST Gemdos call macros
 ;;;
 ;;; This is free and unencumbered software released into the public domain.
 ;;; For more information, please refer to <http://unlicense.org>
 
 	IfND	GEMDOS_I
-GEMDOS_I	SET	1
+GEMDOS_I:	SET	1
 
 
 CRAWCIN:	Macro ;
@@ -20,7 +20,7 @@ CRAWCIN:	Macro ;
 	
 CCONWS:	Macro ; \1:text.l
 	;; ------------------------------------
-	pea	\1		; text.l
+	move.l	\1,-(a7)		; text.l
 	move.w	#9,-(a7)		; <Cconws>
 	trap	#1		; Gemdos
 	addq.w	#6,a7		; stack adjust
@@ -68,7 +68,7 @@ FCLOSE:	Macro ; \1:hdl.w
 FOPEN:	Macro ; \1:path.l \2:mode.w
 	;; ------------------------------------
 	move.w	\2,-(a7)		; mode
-	pea	\1		; path
+	move.l	\1,-(a7)		; path
 	move.w	#61,-(a7)		; opcode
 	trap	#1		;
 	addq.w	#8,a7		;
@@ -78,7 +78,7 @@ FOPEN:	Macro ; \1:path.l \2:mode.w
 
 FREAD:	Macro ; \1:hdl.w \2:buffer.l \3:count.l
 	;; ------------------------------------
-	pea	\2		; buffer
+	move.l	\2,-(a7)		; buffer
 	move.l	\3,-(a7)		; count
 	move.w	\1,-(a7)		; handle
 	move.w	#63,-(a7)		; opcode
@@ -120,22 +120,6 @@ MSHRINK:	Macro ; \1:addr.l \2:count.l
 	;; ------------------------------------
 	EndM
 
-VSYNC:	Macro ;
-	;; ------------------------------------
-	move.w	#$25,-(a7)		; opcode
-	trap	#14		; Xbios
-	addq.w	#2,a7		; stack adjust
-	;; ------------------------------------
-	EndM
-
-SUPEREXEC:	Macro ; \1:addr.l
-	;; ------------------------------------
-	pea	\1		; routine address
-	move.w	#$26,-(a7)		; opcode
-	trap	#14		; Xbios
-	addq.w	#6,a7		; stack adjust
-	;; ------------------------------------
-	EndM
 
 	EndC ; GEMDOS_I
 

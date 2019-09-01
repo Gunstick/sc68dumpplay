@@ -17,7 +17,7 @@
 ;;; Out:
 ;;;  d0.w handle
 ;;; 
-Fopen:	FOPEN	(a0),d0
+Fopen:	FOPEN	a0,d0
 	rts
 
 ;;; Fclose(hdl.w) => TOS error
@@ -44,7 +44,7 @@ Fclose:	FCLOSE	d0
 ;;;  d0.l count or TOS error
 ;;;  N set on error
 ;;; 
-Fread:	FREAD	d0,(a0),d1
+Fread:	FREAD	d0,a0,d1
 	rts
 
 ;;; Malloc(count.l)
