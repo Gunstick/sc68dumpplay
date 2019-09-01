@@ -89,7 +89,7 @@ programs += $1
 $$($1_prg): $$($1_objs)
 endef
 
-$(eval $(call target_tpl,ymplay,prg,ymplay ymdump gemdos aes_fsel))
+$(eval $(call target_tpl,ymplay,prg,ymplay ymdump gemdos aes_fsel dosread))
 $(eval $(call target_tpl,testcli,ttp,testcli))
 $(eval $(call target_tpl,testdmp,tos,testdmp ymdump))
 
@@ -100,8 +100,8 @@ targets := $(foreach n,$(programs),$(value $n_prg))
 all: $(targets)
 
 $(testdmp_prg): INCS = -I$(srcdir)
+$(call depnames,testdmp): INCS = -I$(srcdir)
 
-#$(call objnames,testdmp): 
 clean: ; rm -f $(targets) $(objects) $(depends)
 .PHONY: all clean
 

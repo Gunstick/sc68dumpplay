@@ -8,16 +8,16 @@
 ;;;
 
 	Include	"ymdump.i"
-	Include	"gemdos.i"
-
+	Include	"xbios.i"
 	Include	"start.i"
 	
 	STARTUP	main,(a7)
-main:	SUPEREXEC	superrout
+main:	SUPEREXEC	#superrout
+	moveq	#0,d0		; no error code
 	rts
 
 superrout:	
-	bclr	#0,$484.w		;
+	bclr	#0,$484.w		; No clicks
 	move.l	$4ba.w,hz200
 	lea	ymstat,a0
 	move.l	#eof,a1
