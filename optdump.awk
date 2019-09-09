@@ -31,6 +31,13 @@ BEGIN {
      prev[i]=cur[i]
    }
  }
+ for (i=-1;i<7;i+=2) {
+   #print i"=" cur[i] ":" cur[i+1]
+   if( (cur[i]!="..") || (cur[i+1]!="..")) {
+     f=(cur[i+1]==".."?""prev[i+1]:""cur[i+1]) (cur[i]==".."?""prev[i]:""cur[i])
+     frequencies[f]++
+   }
+ }
  print ""
  lines++
 }
@@ -43,4 +50,7 @@ END{
   }
   print "" > "/dev/stderr"
   print "Total register writes:" writes > "/dev/stderr"
+  print "Frequencies:" > "/dev/stderr"
+  for (f in frequencies)
+    print f " " strtonum("0x"f) " " int(2000000/16/(strtonum("0x"f)==0?1:f)) "Hz " frequencies[f] > "/dev/stderr"
 }

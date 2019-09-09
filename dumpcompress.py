@@ -12,6 +12,7 @@
 # https://github.com/Gunstick/spriterecord/blob/master/ym2ymx.pl?fbclid=IwAR0N-YjwYHH_GAVuU3liUEq8frp_TxQIZuE0-myG1iu7PH3qVu_5mml8arY#L28
 
 import sys
+import binascii
 
 def main():
   if len(sys.argv) < 3:
@@ -261,14 +262,40 @@ def ympkst():
   ympkstversion=1
   ympkstflags=0
   inputdump = opendump(sys.argv[2])
-  writedump(inputdump,''.join(str(ord(c)) for c in ympkstmagic),-1,ympkstmagic)
+  writedump(inputdump,''.join(f'{ord(c):02x}' for c in ympkstmagic),-1,ympkstmagic)
   #print("# "+ympkstmagic)  # magic string
   #print(''.join(str(ord(c)) for c in ympkstmagic))
   #print(f"# v={ympkstversion} flags={ympkstflags}")      # version , flags
   #print(f'{ympkstversion+0x30:02x}{ympkstflags+0x30:02x}')           # each one byte char
   writedump(inputdump,f'{ympkstversion+0x30:02x}{ympkstflags+0x30:02x}',-1,f"# v={ympkstversion} flags={ympkstflags}")
-  
-  writedump(inputdump,2000000,4,"clock 2Mhz on big endian uint32")   # YM on ST is 2MHz
+  # better to use an mfp clock to play it nicer on ST
+  # see ym2mfp for the conversion
+  # int(round(current.clk * mfp_clk / mfp_div / psg_clk)) 
+  # mfp_clk = 2457600.0
+  # mfp_div = 16
+  # psg_clk = 8010690.0/4       # Approx
+  # i.e. prediv 16 gives a resolution of 153.6KHZ
+  # means for a 1 vbl clock the ym does 40064 ticks
+  # with an mfp at 153kht, this gives a count of 3069 timer ticks per vbl
+  # so the player has to divide that by 256 and ignore 11 interrupts and count 253 ticks more
+  # 3069>>8=11, 3069&255=253
+ 
+  # define the ST
+  mfp_clk = 2457600.0
+  mfp_div = 16
+  # atari used various quartz components, and emulators too
+  pal_quartz     =32084988
+  median_quartz  =32042760
+  saint_quartz   =32084992   # also hatari, sc68. Best for mfp conversions
+  ntsc_odd_quartz=32028400   # paolo simoes' ST
+  ntsc_stf_quartz=32042400
+  ntsc_ste_quartz=32215905
+  psg_clk = 8010690.0/4    
+  psg_clk = int(saint_quartz/4/4)   # something around 2Mhz
+  mfp_adjust=mfp_clk / mfp_div / psg_clk
+
+  #writedump(inputdump,psg_clk,4,"clock 2Mhz on big endian uint32")   # YM on ST is 2MHz
+  writedump(inputdump,int(round(psg_clk * mfp_adjust)),4,"mfp timer in Mhz on big endian uint32")   # YM on ST is 2MHz
   writedump(inputdump,0,4,"data size big endian uint32 (0 if unknown)")
 
   prevregistervalues="..-..-..-..-..-..-..-..-..-..-..-..-..-..".split("-")
@@ -314,7 +341,9 @@ def ympkst():
     if flags == 0:
       continue
 
-    writedump(inputdump,ympkstcycles(ymtime-prevymtime),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x}') 
+    # convert a 2Mhz ym clock value to an mfp clock value:
+    mfp_ticks=int(round((ymtime-prevymtime) * mfp_adjust))
+    writedump(inputdump,ympkstcycles(mfp_ticks),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x} mfp:{mfp_ticks}') 
     prevymtime=ymtime
     # need to decide which method to use for encoding
     # check if only shap register written
@@ -377,7 +406,7 @@ def ympkst():
 
   closedump(inputdump,ymtime)
 
-
+  
 def ympkstcycles(ticks):
   # input is an integer
   # returns as hex string the variable length unsigned integer big endian
@@ -410,6 +439,7 @@ def opendump(fname):   # future: return opject with opened in and multiple out f
    # welcome to python: dicts are initiated withh {} but indexed with []
    return {
      "infd": open(fname, 'r'),    # reading file
+     "outbinfd": open(fname+".bin",'wb'),   # writing binary data
      "outcount": 0,               # counts effective number of bytes written
      "incount" : 0               # counts each time bytes are written
    }
@@ -435,13 +465,16 @@ def writedump(fd,value,length,comment):     # fd not used yet
   if comment != "":
     print(f'# {comment} v={value} l={length}')
   try: 
-    print(f'{value:0{length*2}x}')   # print hex if it's an integer
+    hexstring=f'{value:0{length*2}x}' # print hex if it's an integer
   except ValueError:
-    print(f'{value:0>{length*2}}')    # print as string
+    hexstring=f'{value:0>{length*2}}' # print as string
+  print(hexstring)
+  fd["outbinfd"].write(binascii.unhexlify(hexstring))
   fd["outcount"]=fd["outcount"]+length
 
 def closedump(fd,ymt):
   fd["infd"].close()
+  fd["outbinfd"].close()
   print(f'#read {fd["incount"]} bytes, wrote {fd["outcount"]} bytes ({(1-fd["outcount"]/fd["incount"])*100:.2f}%), for {ymt/40064/50:.2f} s = {fd["outcount"]/(ymt/40064/50):.2f} bytes/s')
 # welcome to python
 if __name__=="__main__":
