@@ -7,7 +7,7 @@
 ;;; For more information, please refer to <http://unlicense.org>
 
 	IfND	GEMDOS_I
-GEMDOS_I:	SET	1
+GEMDOS_I:	Set	1
 
 
 CRAWCIN:	Macro ;
@@ -121,7 +121,7 @@ MSHRINK:	Macro ; \1:addr.l \2:count.l
 	EndM
 
 
-	EndC ; GEMDOS_I
+	EndC	; GEMDOS_I
 
 ;;; Local Variables:
 ;;; mode: asm

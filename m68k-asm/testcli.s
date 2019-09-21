@@ -1,7 +1,7 @@
 ;;; @file    testcli.s
 ;;; @author  Benjamin Gerard AKA Ben/OVR
 ;;; @date    2019-08-25
-;;; @brief   Testing command line parser
+;;; @brief   Program testing the command line parser.
 ;;;
 ;;; This is free and unencumbered software released into the public domain.
 ;;; For more information, please refer to <http://unlicense.org>
@@ -62,7 +62,7 @@ print_word:
 	;; 
 
 Thex:	dc.b	"0123456789ABCDEF"
-clistr:	dc.b	27,"E"		; vt52 cls
+clistr:	dc.b	27,"E"		; ESC<E>: CLS
 	dcb.b	128,0
 	
 ;;; Local Variables:

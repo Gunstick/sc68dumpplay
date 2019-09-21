@@ -6,7 +6,7 @@
 ;;; This is free and unencumbered software released into the public domain.
 ;;; For more information, please refer to <http://unlicense.org>
 
-	include	"ifread.i"
+	include	"dosread.i"
 	include	"gemdos.i"
 
 ;;; ----------------------------------------------------------------------
@@ -21,8 +21,7 @@ dos_open:
 	clr.w	dos_hdl(a0)
 	clr.l	dos_pos(a0)
 	pea	(a0)
-	move.l	dos_path(a0),a0
-	FOPEN	(a0),#0
+	FOPEN	dos_path(a0),#0
 	move.l	(a7)+,a0
 	move.w	d0,dos_hdl(a0)
 	rts
@@ -37,14 +36,12 @@ dos_open:
 
 dos_close:
 	move.w	dos_hdl(a0),d0
+	ext.l	d0
 	bmi.s	.error
 	clr.w	dos_hdl(a0)
 	pea	(a0)
 	FCLOSE	d0
 	move.l	(a7)+,a0
-	bls.s	.error
-	add.l	d0,dos_pos(a0)
-	tst.l	d0
 .error:
 	rts
 
@@ -59,8 +56,11 @@ dos_close:
 
 dos_read:
 	pea	(a0)
-	FREAD	dos_hdl(a0),(a1),d0
+	FREAD	dos_hdl(a0),a1,d0
 	move.l	(a7)+,a0
+	bls.s	.error
+	add.l	d0,dos_pos(a0)
+.error:
 	rts
 
 ;;; ----------------------------------------------------------------------
@@ -76,7 +76,7 @@ dos_tell:	moveq	#-1,d0
 	move.l	dos_pos(a0),d0
 .error:
 	rts
-	
+
 ;;; ----------------------------------------------------------------------
 ;;;
 ;;; dos_init() - Setup Interface
@@ -94,6 +94,13 @@ dos_init:
 	move.w	#-1,(a0)+		; handle
 	suba.w	#dos_SZ,a0
 	rts
+
+	;; Public symbols
+	xdef	dos_init
+	xdef	dos_open
+	xdef	dos_close
+	xdef	dos_read
+	xdef	dos_tell
 
 ;;; Local Variables:
 ;;; mode: asm

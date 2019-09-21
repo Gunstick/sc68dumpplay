@@ -10,7 +10,8 @@
 	IfND	YMDUMP_I
 YMDUMP_I:	set	1
 
-	Xdef	ymdmp_next,ymdmp_decode
+	xref	ymdmp_next
+	xref	ymdmp_decode
 
 	rsreset
 ymdmp_clk:	rs.w	3
@@ -18,7 +19,7 @@ ymdmp_set:	rs.w	1
 ymdmp_reg:	rs.b	14
 ymdmp_SIZ:	rs.w	0
 
-	EndC ; YMDUMP_I
+	EndC	; YMDUMP_I
 
 ymdmp_DS:	Macro
 	ds.b	ymdmp_SIZ

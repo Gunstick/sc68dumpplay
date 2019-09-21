@@ -7,14 +7,14 @@
 # By Benjamin Gerard AKA Ben/OVR
 #
 
-srcdir := $(dir $(lastword $(MAKEFILE_LIST)))
+MAKEFILE := $(lastword $(MAKEFILE_LIST))
+srcdir := $(dir $(MAKEFILE))
 
 .DELETE_ON_ERROR:
 .SUFFIXES:
 .SUFFIXES: .d .s .i .o .tos .ttp .prg
 .DEFAULT_GOAL := all
 
-vpath %.i $(srcdir)m68k-asm
 vpath %.s $(srcdir)m68k-asm
 
 # ----------------------------------------------------------------------
@@ -25,23 +25,21 @@ VLINK.tos = $(strip $(VLINK) -b ataritos $(TOSFLAGS) $(VL-S) -o)
 VASM = vasmm68k_mot
 VASM.o = $(strip $(VASM) $(VASM_ASM) -Felf -o)
 VASM.d = $(strip $(VASM) $(VASM_DEP) -depend=make -o)
-VASM.tos = $(strip $(VASM)  $(VASM_FLAGS) -monst $(TOSFLAGS) -Ftos -o)
+VASM.tos = $(strip $(VASM) $(VASM_ASM) -monst $(TOSFLAGS) -Ftos -o)
 
-VASM_ASM = -quiet $(DEFS) $(INCS) $(VASM_CPU) $(MAXERRORS) $(NOCASE) $(NOSYM)\
- $(PIC) $(VASM_MOT) $(VASM_CPU) $(VASM_OPT)
-
-VASM_DEP = -quiet $(DEFS) $(INCS) -maxerrors=1 $(NOCASE) -w -no-opt 
-
+VASM_ASM = -quiet $(DEFS) $(INCS) $(VASM_CPU) -x $(MAXERRORS) $(NOCASE)\
+ $(NOSYM) $(PIC) $(VASM_MOT) $(VASM_CPU) $(VASM_OPT)
+VASM_DEP = $(VASM_ASM)
 VASM_MOT = $(ALIGN) $(DEVPAC)
 VASM_CPU = -m68000
-VASM_OPT = -no-opt
+VASM_OPT = -showopt
 
 MAXERRORS = -maxerrors=0
 # PIC = -pic
 # NOSYM = -nosym
 # NOCASE = -nocase
 ALIGN = -align
-DEVPAC = -devpac #GB: I'm using IfNB 
+DEVPAC = -devpac
 
 FLAV :=
 # D=1 for debug build
@@ -54,14 +52,10 @@ endif
 # R=1 for release build
 ifeq ($(R),1)
 FLAV := r$(FLAV)
-VASM_OPT = -opt-speed -showcrit
+VASM_OPT = -opt-speed -showopt #-showcrit
 DEFS = -DNDEBUG=1
 NOSYM = -nosym
 VL-S = -s
-endif
-
-ifneq ($(srcdir),./)
-
 endif
 
 # ----------------------------------------------------------------------
@@ -72,8 +66,8 @@ targets :=
 programs := 
 
 dirname = $(and $1,$1$(and $(FLAV),-$(FLAV))/)
-dir.o := $(call dirname,_build)
-dir.d := $(call dirname,_build)
+dir.o := $(call dirname,_build/o)
+dir.d := $(call dirname,_build/d)
 dir.tos := $(call dirname,)
 
 objnames = $(strip $(1:%=$(dir.o)%.o))
@@ -89,7 +83,8 @@ programs += $1
 $$($1_prg): $$($1_objs)
 endef
 
-$(eval $(call target_tpl,ymplay,prg,ymplay ymdump gemdos aes_fsel dosread))
+ymplay_nude = ymplay ymdump gemdos aes dosread ibuffer
+$(eval $(call target_tpl,ymplay,prg,$(ymplay_nude)))
 $(eval $(call target_tpl,testcli,ttp,testcli))
 $(eval $(call target_tpl,testdmp,tos,testdmp ymdump))
 
@@ -102,35 +97,28 @@ all: $(targets)
 $(testdmp_prg): INCS = -I$(srcdir)
 $(call depnames,testdmp): INCS = -I$(srcdir)
 
-clean: ; rm -f $(targets) $(objects) $(depends)
-.PHONY: all clean
+clean: ; rm -f -- $(wildcard $(targets) $(objects) $(depends))
+clean-dir: ; rm -rf -- $(wildcard $(sort $(dir.d) $(dir.o) $(dir.tos)))
+clean-all: clean-dir clean
+.PHONY: all clean clean-dir clean-all
 
 # ----------------------------------------------------------------------
 #  Implicit pattern rules
 # ----------------------------------------------------------------------
 
-$(dir.d)%.d: %.s
-	@test -d $(@D) || mkdir -p $(@D)
-	$(VASM.d) $(@:%.d=%.o) $< >$@ || rm -f -- $@
+dir.all = $(sort $(dir.d) $(dir.o) $(dir.tos))
 
-$(dir.o)%.o: %.s
-	@test -d $(@D) || mkdir -p $(@D)
-	$(VASM.o) $@ $<
+$(dir.all): ; mkdir -p -- "$@"
 
-$(call prgnames,%.tos %.ttp %.prg):
-	@test -d $(@D) || mkdir -p $(@D)
+$(call objnames,%): %.s $(call depnames,%) $(MAKEFILE_LIST) | $(dir.all)
+	$(VASM.o) $@ -depfile $(call depnames,$*) $<
+
+$(call prgnames,%.tos %.ttp %.prg): | $(dir.tos)
 	$(VLINK.tos) $@ $^
 
 # ----------------------------------------------------------------------
 #  Dependencies
 # ----------------------------------------------------------------------
 
-dep depend depends: $(depends)
-.PHONY: dep depend depends
-
-ifndef NODEPS
-ifneq ($(MAKECMDGOALS),clean)
-$(depends) $(objects): $(lastword $(MAKEFILE_LIST))
--include $(depends)
-endif
-endif
+$(depends):
+include $(wildcard $(depends))

@@ -1,19 +1,16 @@
-;;; @file    aes_fsel.s
+;;; @file    aes.s
 ;;; @author  Benjamin Gerard AKA Ben/OVR
 ;;; @date    2018-04-09
-;;; @brief   AES/GEM file selector
+;;; @brief   AES/GEM helpers
 ;;;
 ;;; This is free and unencumbered software released into the public domain.
 ;;; For more information, please refer to <http://unlicense.org>
 
-;;; ----------------------------------------------------------------------
-	SECTION	text
-;;; ----------------------------------------------------------------------
 
 	xdef	aes_init
-	xdef	aes_fsel		; d0> selected file path or 0.l
-	xdef	aes_mask		; a0< filename
-	xdef	aes_alert		; d0< def-button a0< text d0>button
+	xdef	aes_fsel  ; d0> selected file path or 0.l
+	xdef	aes_mask  ; a0< filename
+	xdef	aes_alert ; d0< def-button a0< text d0>button
 
 ;;; ----------------------------------------------------------------------
 aes_init:
@@ -168,14 +165,16 @@ aes_fsel:
 	DATA
 
 aes10:	dc.w	10,0,1,0,0	; app_init() -> appid
-aes52:	dc.w	52,1,1,1,0	; form_alert (button,text) -> button index
+aes52:	dc.w	52,1,1,1,0	; form_alert(button,text)->button.idx
 aes90:	dc.w	90,0,2,2,0	; fsel_input(inpath,inselect,&button)
-
 
 mask:		dc.b "\*.*"
 		ds.b 12
 
-;;; ----------------------------------------------------------------------
+;;; ------------------------------------------------
+;;; ------------------------------------------------
+;;; 
+
 	BSS
 
 		rsreset

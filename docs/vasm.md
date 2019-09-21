@@ -5,59 +5,59 @@ General Assembler Options:
 -------------------------
 
 * `-chklabels`<br/>
-  Warn when symbols matchs reserved keywords.
+    Warn when symbols matchs reserved keywords.
 * `-D{name}[=expression]`<br/>
-  Define a symbol.
+    Define a symbol.
 * `-depend={type}`<br/>
-   Print dependencies while assembling. *NO OUTPUT IS GENERATED*.
+    Print dependencies while assembling. *NO OUTPUT IS GENERATED*.
 * `-dependall={type}`
 * `-dwarf[=version]`
 * `-esc`<br/>
-     Enable C-style escape character sequences in strings.
+    Enable C-style escape character sequences in strings.
 * `-F{fmt}`<br/>
-     Set ouput format.
+    Set ouput format.
 * `-I{path}`<br/>
-     Add include path.
+    Add include path.
 * `-ignore-mult-inc`<br/>
-     Include the same file path only once.
+    Include the same file path only once.
 * `-L` {listfile}<br/>
-     Generate listing file.
+    Generate listing file.
 * `-Ll{lines}<br/>
-     Set the number of lines per listing file page.
+    Set the number of lines per listing file page.
 * `-Lnf`<br/>
-     no form feed into generatied listing for new parges.
+    No form feed into generatied listing for new parges.
 * `-Lns<br/>
-     Do not include symbols in the listing file.
+    Do not include symbols in the listing file.
 * `-maxerrors=n`<br/>
-     Max number of error before abortion (0=infinite).
+    Max number of error before abortion (0=infinite).
 * `-maxmacrecurs=n`<br/>
-     The maximum of number of recursions within a macro.
+    The maximum of number of recursions within a macro.
 * `-nocase`<br/>
-     Disables case-sensitivity for everything.
+    Disables case-sensitivity for everything.
 * `-noesc`<br/>
-     No escape character sequences.
+    No escape character sequences.
 * `-noialign`<br/>
-     Perform no automatic alignment for instructions.
+    Perform no automatic alignment for instructions.
 * `-nosym`<br/>
-     Strips all local symbols from the output file.
+    Strips all local symbols from the output file.
 * `-nowarn=n`<br/>
-     Disable warning message <n>.
+    Disable warning message <n>.
 * `-o {ofile}`<br/>
-     Set output file (or make depend target).
+    Set output file (or make depend target).
 * `-pic`<br/>
-     Generates position independant code or fail.
+    Generates position independant code or fail.
 * `-quiet`<br/>
-     No copyright notice nor final statistics.
+    No copyright notice nor final statistics.
 * `-unnamed-sections`<br/>
-     merges section with same attribut ignoring their names.
+    Merges section with same attribut ignoring their names.
 * `-unsshift`<br/>
-     shift-right operator (>>) is unsigned
+    Shift-right operator (>>) is unsigned
 * `-w`<br/>
-     Hide all warning messages.
+    Hide all warning messages.
 * `-wfail`<br/>
-     warnings generate errors.
+    Warnings generate errors.
 * `-x`<br/>
-     Show an error message, when referencing an undefined symbol.
+    Show an error message, when referencing an undefined symbol.
 
 
  Mot syntax module:
@@ -139,7 +139,7 @@ General Assembler Options:
 * `-opt-allbra`<br/>
     Optimize even branch with a valid size specified
 * `-opt-brajmp`<br/>
-    bra/jmp_pc into jmp_abs accross sections
+    BRA/JMP_pc into jmp_abs accross sections
 * `-opt-clr`<br/>
     MOVE #0,<ea> into CLR <ea> for the MC68000
 * `-opt-fconst`<br/>
@@ -200,4 +200,3 @@ General Assembler Options:
     of just by. This syntax was used by the SGS assembler.
 * `-regsymredef`<br/>
     Allow redefining register symbols with EQUR.
-

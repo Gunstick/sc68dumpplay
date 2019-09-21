@@ -6,71 +6,82 @@
 ;;; This is free and unencumbered software released into the public domain.
 ;;; For more information, please refer to <http://unlicense.org>
 
+	;; opt	O+,W+
+	
+BUFFERSZ:	Set	1024
+	
 	Include	"start.i"
+	Include	"dosread.i"
+	Include	"aes.i"
 
-	STARTUP	main,ustack,a0
+	STARTUP	main,ustack
 
 main:
+	CCONWS	#cls
+
 	move.l	$4(a7),d0		; d0: argc
 	move.l	$8(a7),a0		; a0: argv 
-	move.l	$c(a7),a1		; a1: basepage
+	;; move.l	$c(a7),a1		; a1: basepage
 
-	;; cls
-	lea	clistr+3,a2
-	bsr	print_word
+	subq	#1,d0
+	bmi	filesel
+
+	move.l	(a0),a1		; a1: path
+	bra	fileini
+
+filesel:	
+	;; Init GEM/AES
+	bsr	aes_init	      ; Setup GEM/AES
+	lea	omask,a0	      ; "*.DMP"
+	bsr	aes_mask	      ; Setup fileselector mask
+	bsr	aes_fsel	      ; Call AES fileselector
+	tst.l	d0	      ; Canceled ?
+	beq	exit_error
+	move.l	d0,a1		; a1: Path
+
+	;; Open dump file (a1:path)
+fileini:	lea	dos,a0		; a0: DOS struct
+	move.l	a1,dos_path(a0)	; * dos_path
+	bsr	dos_init		;
+	bsr	dos_open		;
+
+	;; move.l	a0,a1		; a1: Dos
+	;; lea	isb,a0		; a0: isb
+	;; move.l	#BUFFERSZ,d0		; d0: isb size
+	;; bsr	isb_init		; isb_init()
+	;; bsr	isb_open		; isb_open()
+
+	bmi	exit_error
+
+loop:	moveq	#60,d0
+	lea	line,a1
 	
- 	lea	clistr,a2
- 	moveq	#15,d1
- 	and.b	d0,d1
- 	move.l	d0,d2
- 	lsr	#4,d2
- 	move.b	Thex(pc,d2.w),(a2)+
- 	move.b	Thex(pc,d1.w),(a2)+
- 	addq.w	#1,a2
-	bsr	print_word
+	lea	dos,a0
+	bsr	dos_read
+	bmi.s	exit_close
+	cmp.w	#60,d0
+	bls	exit_close
 
-	bra.s	print_next	
-print_args:	
- 	lea	clistr,a2
-	move.l	(a0)+,a3
+	lea	-1(a1,d0.l),a2
+	move.b	(a2),-(a7)
+	pea	(a2)
+	clr.b	(a2)
+	CCONWS	a1
+	move.l	(a7)+,a2
+	move.b	(a7)+,(a2)
 
-	move.b	#27,(a2)+
-	move.b	#"p",(a2)+		; ESC<q> (reverse video)
-.copy:
-	move.b	(a3)+,(a2)+
-	bne.s	.copy
-	bsr	print_word
-print_next:	
-	dbf	d0,print_args
+	CCONWS	#cr
+	bra	loop
 	
-	CRAWCIN	
-	moveq	#0,d0
-	rts
-
-print_word:
-	move.b	#27,-1(a2)
-	move.b	#"q",(a2)+		; ESC<q> (normal video)
- 	move.b	#$D,(a2)+		; <CR>
- 	move.b	#$A,(a2)+		; <LF>
- 	clr.b	(a2)		; <NUL>
-	movem.l	d0-a6,-(a7)
-	CCONWS	clistr
-	movem.l	(a7)+,d0-a6
-	rts
-
-Thex:	dc.b	"0123456789ABCDEF"
-clistr:	dc.b	27,"E"		; vt52 cls
-	ds.b	128
-omask:	dc.b	"*.dmp",0
-	even
-
+exit_close:
+	;; lea	isb,a0		; a0: isb
+	;; bsr	isb_close		;
+	lea	dos,a0
+	bsr	dos_close
 	
-	;; init GEM/AES
-	bsr	aes_init	; Setup GEM/AES
-	lea	omask(pc),a0	; "*.dmp"
-	bsr	aes_mask	; Setup fileselector mask
-
-
+exit_error:	moveq	#-1,d0
+exit:	rts
+	
 ;;; *******************************************************
 
 ;; 	;; Save A7 and SR for clean exit
@@ -100,19 +111,66 @@ omask:	dc.b	"*.dmp",0
 ;; save_st:
 ;; 	rts
 
-;; rest_st:
-;; 	rts
+	IFD	toto
 	
-;;; *******************************************************
-;;; *******************************************************
+;; rest_st:
+	;; 	rts
 
-	SECTION BSS
+	moveq	#0,d1		; d1: delta-time
+	moveq	#0,d7		; d7: zero
 
-;;; *******************************************************
-;;; *******************************************************
+	move.l	(a0)+,d0		; oplong
+	bmi	.extended
+	swap	d0		; d0: RRVV-TIME
+	add.w	d0,d1
+	addx.l	d7,d1		; [deltacode]
+	beq	.now
+	
+	cmp.l	d2,d1		; active ?
+	bhi	.s
+.s:	
 
-exitcode:
-	ds.w	1
+.extended:	
+	neg.l	d0
+
+
+.now:
+	;; add.l	
+
+	ENDC	
+	
+;;; TimeCode.w <= 0 -> extended time code 
+;;;            else -> delta clock
+;;;
+;;; DCA98 76420
+;;;
+;;;
+;;;
+;;;
+;;;
+;;; 
+
+;;; ------------------------------------------------
+;;; ------------------------------------------------
+;;; 
+	even
+	DATA
+	
+omask:	dc.b	"*.DMP",0		; Fileselect mask
+cls:	dc.b	27,"E",27,"f",27,"w",0	; CLS and setup
+cll:	dc.b	27,"L",0		; Clear line
+crlf:	dc.b	13,10,0		; CR/LF
+cr:	dc.b	13,0		; CR
+
+;;; ------------------------------------------------
+;;; ------------------------------------------------
+;;; 
+	even
+	BSS
+
+line:	ds.b	84
+dos:	dos_DS	1
+;; isb:	isb_DS	BUFFERSZ
 	
 	;; Our stacks
 	even

@@ -9,6 +9,7 @@
 	IfND	START_I
 START_I:	Set	1
 
+	
 	Include	"gemdos.i"
 
 STARTUP:	Macro ; \1:main \2:USP
@@ -26,7 +27,8 @@ start:
 	move.l	$0c(a0),a1		; a1:= TEXT size
 	adda.l	$14(a0),a1		; a1+= DATA size
 	adda.l	$1c(a0),a1		; a1+= BSS size
-	lea	$100(a1),a1		; a1+= Basepage size => prog size
+	lea	$100(a1),a1		; a1+= Basepage size
+				; a1 = Program size
 
 	;; Free memory
 	pea	(a0)
@@ -40,8 +42,7 @@ start:
 	and.b	(a1)+,d1		; d1:= CLI length
 	move.l	a1,a2		; a2:= Parsed cli
 	;;
-bp:	
-	moveq	#32,d3		; d3:= < > argument delimiter
+	moveq	#32,d3		; d3:= < >
 	lea	.STskip(pc),a3	; a3:= .STskip
 	bra.s	.next
 
@@ -54,10 +55,10 @@ bp:
 	jmp	(a3)		; state machine
 
 	;; ------------------------------------
-	;; Stat Skip (in between arguments)
+	;; Status Skip (in between arguments)
 .STskip:
 	cmp.b	d3,d7		; ? < >
-	beq.s	.next		; still < > keep doing that
+	beq.s	.next		; still < > continue
 
 	;; Start of a new argument
 	move.l	a2,-(a7)
@@ -70,16 +71,16 @@ bp:
 	;; Enter quoting mode
 .quoting:
 	lea	.STquot(pc),a3	; a3:= .STquot (assume)
-	move.b	d7,d3		; d3:= <'> or <"> argument delimiter
+	move.b	d7,d3		; d3:= <'> or <">
 	bra.s	.next
 	
 .setplain:
 	lea	.STcopy(pc),a3	; a3:= .STcopy
-	moveq	#32,d3		; d3:= < > argument delimiter
+	moveq	#32,d3		; d3:= < >
 	bra.s	.store
 
 	;; ------------------------------------
-	;; Stat quot (copy up to delimiter)
+	;; Status Quot (copy up to delimiter)
 .STquot:
 	cmp.b	d3,d7
 	bne.s	.store
@@ -88,14 +89,14 @@ bp:
 	bra.s	.next
 
 	;; ------------------------------------
-	;; Stat copy
+	;; Status Copy word
 .STcopy:
 	cmp.b	#39,d7		; ? <'>
 	beq.s	.quoting		;
 	cmp.b	#34,d7		; ? <">
 	beq.s	.quoting		;
 
-	;; reach our delimitor
+	;; reach delimiter
 	cmp.b	d3,d7
 	bne.s	.store
 
@@ -110,7 +111,7 @@ bp:
 	move.b	d7,(a2)+
 .next:
 	dbf	d1,.parse
-	clr.b	(a2)		; be sure to close that argument
+	clr.b	(a2)		; close that argument
 
 
 	;; reverse arguments order
@@ -129,23 +130,19 @@ bp:
 .reversed:
 	
 
-	;; IfNB	\1
 	;; Exec main()
 	pea	(a0)		; push basepage
 	pea	(a2)		; push argv
 	move.l	d0,-(a7)		; push argc
-	jsr	\1		; Call main(argc,argv,basepage)
+	jsr	\1		; main(argc,argv,bp)
 	lea	12(a7),a7		; stack adjust
 	;; Exit with d0
 	PTERM	d0
-	;; else
-	;; PETERM0
-	;; EndC
-	;; 
+
 	;; ------------------------------------
 	EndM
 	
-	EndC ; START_I
+	EndC	; START_I
 
 ;;; Local Variables:
 ;;; mode: asm

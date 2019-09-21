@@ -1,25 +1,20 @@
-;;; @file    ifread.i
+;;; @file    aes.i
 ;;; @author  Benjamin Gerard AKA Ben/OVR
-;;; @date    2019-09-01
-;;; @brief   Read interface
+;;; @date    2019-09-02
+;;; @brief   AES definitions
 ;;;
 ;;; This is free and unencumbered software released into the public domain.
 ;;; For more information, please refer to <http://unlicense.org>
 
 
-	IfND	IFREAD_I
-IFREAD_I:	Set	1
+	IfND	AES_I
+AES_I:	Set	1
 
-	;; ifread struct
-	rsreset
-if_open:	rs.l	1		; |open()
-if_close:	rs.l	1		; |close()
-if_read:	rs.l	1		; |read()
-if_tell:	rs.l	1		; |tell()
-if_SZ:	rs.w	0
+	xref	aes_init
+	xref	aes_mask
+	xref	aes_fsel
 
-	
-	EndC	; IFREAD_I
+	EndC	; AES_I
 	
 ;;; Local Variables:
 ;;; mode: asm

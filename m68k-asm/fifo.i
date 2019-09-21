@@ -8,7 +8,8 @@
 
 
 	IfND	FIFO_I
-FIFO_I:	SET	1
+FIFO_I:	Set	1
+
 
 	;; fifo struct
 	rsreset
@@ -20,13 +21,13 @@ fifo_len:	rs.w	1        ; fifo length
 fifo_buf:	rs.b	0        ; buffer start here
 
 	;; exported functions
-	xdef	fifo_size
-	xdef	fifo_used
-	xdef	fifo_free
-	xdef	fifo_push
-	xdef	fifo_pull
+	xref	fifo_size
+	xref	fifo_used
+	xref	fifo_free
+	xref	fifo_push
+	xref	fifo_pull
 
-	EndC ; FIFO_I
+	EndC	; FIFO_I
 	
 ;;; Local Variables:
 ;;; mode: asm
