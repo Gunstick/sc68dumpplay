@@ -19,11 +19,63 @@
 ;;; | ...... .......... FF-0F-FF-0F-FF-0F-..-..-0D-..-..-..-..-.. |
 ;;; +-------------------------------------------------------------+
 ;;;
-	
+
 	Include	"ymdump.i"
+	Include	"debug.i"
 
 	;; -------------------------------------
 
+;;; ymdmp_delta() - compute delta clock
+;;;
+;;; Inp:
+;;;   a0.l ymdmp struct (t0)
+;;;   a1.l ymdmp struct (t1)
+;;; Out:
+;;;   d0.l number of MFP-timer cycles * 128
+;;; Use:
+;;;   d1,d2
+;;;
+ymdmp_delta:
+
+	move.l	ymdmp_clk+2(a1),d0
+	sub.l	ymdmp_clk+2(a0),d0
+	ASSERT	ls,cmp.l,#$1a16d3f,d0	; check overflow on mul
+
+	IfD	DEBUG
+	move.w	ymdmp_clk+0(a1),d2
+	move.w	ymdmp_clk+0(a0),d1
+	subx.w	d1,d2		; d2.w:d1.l ym-delta-clock
+	ASSERT	eq,cmp.w,#0,d2	; check overflow
+	EndC	; DEBUG
+
+	;; multiply longword by 157
+
+	move.l	d0,d1		; d0: 1x
+	add.l	d1,d1		; d1: 2x
+	move.l	d1,d2		;
+	add.l	d0,d2		; d2: 3x
+	lsl.l	#2,d2		; d2: 12x (x4+x8)
+	add.l	d2,d0		; d0: 13x (x1+x4+x8)
+	move.l	d1,d2		;
+	lsl.l	#3,d2		; d2: 16x
+	add.l	d2,d0		; d0: 29x (x1+x4+x8+x16)
+	lsl.l	#3,d2		; d2: x128
+	add.l	d2,d0		; d0: x157 (x1+x4+x8+x16+x128)
+	rts
+
+
+;;; ymdmp_next() - Skip to the next ASCII dump
+;;;
+;;; Inp:
+;;;   a0.l ymdmp struct
+;;;   a1.l dump string to decode
+;;; Use:
+;;;   d0-d1
+;;; Out:
+;;;   a1.l next dump
+;;;   d0.l: 0=success -1=Error
+;;;   sr#Z: Set on success
+;;;
 ymdmp_next:
 	moveq	#32,d0
 	moveq	#59,d1
@@ -85,7 +137,7 @@ ymdmp_decode:
 	move.b	d3,(a0)+		; * ymdmp_clk
 	;;
 
-	
+
 	move.b	(a1)+,d0		; d0= clock[5/1]
 	move.b	-48(a2,d0.w),d3	; d3= $CC
 	and.b	d6,d3		; d3= $C0

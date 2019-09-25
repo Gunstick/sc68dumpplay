@@ -12,6 +12,7 @@ YMDUMP_I:	set	1
 
 	xref	ymdmp_next
 	xref	ymdmp_decode
+	xref	ymdmp_deltatime
 
 	rsreset
 ymdmp_clk:	rs.w	3
