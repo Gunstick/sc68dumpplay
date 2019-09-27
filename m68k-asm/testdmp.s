@@ -7,19 +7,20 @@
 ;;; For more information, please refer to <http://unlicense.org>
 ;;;
 
+	Include	"debug.i"
 	Include	"ymdump.i"
 	Include	"xbios.i"
 	Include	"start.i"
-	
+
 	STARTUP	main,(a7)
 main:	SUPEREXEC	#superrout
 	rts
 
-tArout:	addq.l	#1,cnt2400
-	eor.w	#$333,$ffff8240.w
-	move.b	#%11011111,$fffffa0F.w	; release In-Service
+tArout:	addq.l	#1,va_tacount
+	;; eor.w	#$333,$ffff8240.w
+	;; move.b	#%11011111,$fffffa0F.w	; release In-Service
 	rte
-	
+
 superrout:
 
 	move.w	sr,savesr		; d1: save SR
@@ -40,40 +41,110 @@ superrout:
 	move.l	#tArout,$134.w	; install new Timer-A Vector
 	bset	#5,$fffffa07.w	; enable timer-A interrupt
 	bset	#5,$fffffa13.w	; unmask timer-A interrupt
-	move.b	#1,$fffffa19.w	; TimerA::TCR=1 -> start 2400-hz
 	move.w	#$2300,sr		; IPL=3
-	
 	bclr	#0,$484.w		; No clicks
-	move.l	$4ba.w,hz200
-	lea	ymstat,a0
-	move.l	#eof,a1
+	bclr	#3,$fffffa17.w	; AEI
 
-loop:	cmpa.l	#eof,a1
-	blo.s	.ok
-	lea	line,a1
-.ok:
-	jsr	ymdmp_decode
 
-	clr.w	$ffff8240.w
-wait:
-	cmp.b	#$39,$fffffc02.w
-	beq.s	over
-	move.l	$4ba.w,d0
-	cmp.l	hz200,d0
-	bls.s	wait
-	addq.l	#3,d0
-	move.l	d0,hz200
-	move.w	#$777,$ffff8240.w
+init_dmp:	;; ------------------------------------
 
-	jsr	ymsend
-	jsr	ymdmp_next
-	bne.s	over
-	bra.s	loop
+	;; Setup init dump
+	lea	ymdump,a0
+	clr.l	ymdmp_clk(a0)
+	clr.w	ymdmp_clk+4(a0)
+	move.w	#(1<<14)-1,ymdmp_set(a0)
+	lea	ym_intval,a1
+	moveq	#13,d0
+copy_reg:
+	move.b	0(a1,d0.w),ymdmp_reg(a0,d0.w)
+	dbf	d0,copy_reg
 
+	lea	line(pc),a0
+	move.l	a0,va_begline
+	move.l	a0,va_curline
+	move.l	#eof,va_endline
+
+	clr.w	va_nxtmfph
+	clr.l	va_nxtmfpl
+	clr.l	va_tacount
+	clr.l	va_nexttdr
+	clr.l	va_nextevt
+
+	move.b	#1,$fffffa19.w	; TimerA::TCR=1 -> start 2400-hz
+	;; ------------------------------------
+
+play_dmp:	;; ------------------------------------
+	move.w	#$700,$ffff8240.w
+	moveq	#$39,d0
+	lea	$fffffc02.w,a5
+	lea	$fffffa1f.w,a4
+	lea	va_tacount,a3
+	move.l	va_nextevt,d7
+test_key:
+	cmp.b	(a5),d0
+	beq	over
+	;;
+	cmp.l	(a3),d7
+	bhi.s	test_key
+	blo.s	skip_low
+
+	move.b	va_nexttdr,d5
+	beq.s	skip_low
+
+	;;
+wait_low:
+	move.b	(a4),d6		; d6.b: TDR
+	neg.b	d6
+	cmp.b	d5,d6		;
+	blo.s	wait_low		;
+skip_low:
+	move.w	#$777,$ffff8240.w	;
+
+	;; commit event to YM
+	lea	ymdump(pc),a0
+	bsr	ymsend
+	clr.w	ymdmp_set(a0)
+
+	;; copy previous timestamp
+	ASSERT	eq,cmpa.l,#ymdump,a0
+	lea	ymprev-ymdump(a0),a1	; a1= ymprev
+	move.l	ymdmp_clk+0(a0),ymdmp_clk+0(a1)
+	move.w	ymdmp_clk+4(a0),ymdmp_clk+4(a1)
+
+	;; get next line
+	move.l	va_curline,a1
+	cmp.l	va_endline,a1
+	bhs	over
+	bsr	ymdmp_decode
+	bsr	ymdmp_next
+	move.l	a1,va_curline
+
+	;; compute delta time to next event
+	lea	ymprev-ymdump(a0),a1	; a1= ymprev (t0)
+	bsr	ymdmp_dclock		; d0= t1-t0 (timer*128)
+
+	;; next event in full precision (timer*128)
+	move.w	va_nxtmfph,d1
+	move.l	va_nxtmfpl,d2
+	add.l	d0,d2
+	moveq	#0,d0
+	addx.w	d0,d1		; d1:d2 nxtmfp
+	move.w	d1,va_nxtmfph
+	move.l	d2,va_nxtmfpl
+	;; convert to timer/4 (divide by 512)
+	lsr	#1,d1		; divide by 2
+	roxr.l	#1,d2
+	move.w	d2,va_nexttdr	; divide by 256
+	move.w	d1,d2		;
+	swap	d2		;
+	move.l	d2,va_nextevt	;
+
+	bra	play_dmp
 over:
 	bclr	#5,$fffffa07.w	; disable timer-A interrupt
 	clr.b	$fffffa19.w		; Stop timer-A
-	move.l	save134,$134.w		; Restore timer-A vector
+	bset	#3,$fffffa17.w	; SEI
+	move.l	save134,$134.w	; restore timer-A vector
 	move.w	#$777,$ffff8240.w	; restore background color
 	lea	$ffff8800.w,a0	; mute YM2149
 	move.l	#$08000000,(a0)	;
@@ -82,6 +153,8 @@ over:
 	moveq	#0,d0		; no error
 	rts
 
+;;; ymsend()
+;;;
 ymsend:
 	lea	$ffff8800.w,a6
 	move.w	ymdmp_set(a0),d0
@@ -120,19 +193,32 @@ I:	SET	I+1
 
 	DATA
 
-line:	incbin	"lap27.dmp"
-eof:	
+ym_intval:	dc.b	0,0,0,0,0,0		; $0-$5 periods
+	dc.b	0,$3f,0,0,0		; $6-$a noise,mixer,volume
+	dc.b	0,0,0		; $b-$d envelop
 	even
 
-	BSS
-hz200:	ds.l	1
+va_begline:	ds.l	1
+va_endline:	ds.l	1
+va_curline:	ds.l	1
+
+va_nxtmfph:	ds.w	1
+va_nxtmfpl:	ds.l	1
+
+va_tacount:	ds.l	1
+va_nextevt:	ds.l	1
+va_nexttdr:	ds.w	1
+
 save134:	ds.l	1
 savesr:	ds.w	1
-cnt2400:	ds.l	1
 
-ymstat:	ymdmp_DS
+ymprev:	ds.w	3		; only need the clock
+ymdump:	ymdmp_DS
 
-	
+line:	incbin	"test.dmp"
+eof:
+	even
+
 ;;; Local Variables:
 ;;; mode: asm
 ;;; indent-tabs-mode: t

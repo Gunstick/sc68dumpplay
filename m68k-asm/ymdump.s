@@ -25,25 +25,25 @@
 
 	;; -------------------------------------
 
-;;; ymdmp_delta() - compute delta clock
+;;; ymdmp_dclock() - compute delta clock
 ;;;
 ;;; Inp:
-;;;   a0.l ymdmp struct (t0)
-;;;   a1.l ymdmp struct (t1)
+;;;   a0.l ymdmp struct (t1)
+;;;   a1.l ymdmp struct (t0)
 ;;; Out:
 ;;;   d0.l number of MFP-timer cycles * 128
 ;;; Use:
 ;;;   d1,d2
 ;;;
-ymdmp_delta:
+ymdmp_dclock:
 
-	move.l	ymdmp_clk+2(a1),d0
-	sub.l	ymdmp_clk+2(a0),d0
+	move.l	ymdmp_clk+2(a0),d0	; d0= t1
+	sub.l	ymdmp_clk+2(a1),d0	; d0= t1-t0
 	ASSERT	ls,cmp.l,#$1a16d3f,d0	; check overflow on mul
 
 	IfD	DEBUG
-	move.w	ymdmp_clk+0(a1),d2
-	move.w	ymdmp_clk+0(a0),d1
+	move.w	ymdmp_clk+0(a0),d2
+	move.w	ymdmp_clk+0(a1),d1
 	subx.w	d1,d2		; d2.w:d1.l ym-delta-clock
 	ASSERT	eq,cmp.w,#0,d2	; check overflow
 	EndC	; DEBUG
@@ -67,7 +67,7 @@ ymdmp_delta:
 ;;; ymdmp_next() - Skip to the next ASCII dump
 ;;;
 ;;; Inp:
-;;;   a0.l ymdmp struct
+;;;   a0.l ymdmp struct (unused)
 ;;;   a1.l dump string to decode
 ;;; Use:
 ;;;   d0-d1
@@ -125,27 +125,16 @@ ymdmp_decode:
 	or.w	d2,d1		; d1= $00AB
 	move.w	d1,(a0)+		; * ymdmp_clk
 
-	Rept	2
+	Rept	4
 	;; ------------------------------------
-	move.b	(a1)+,d0		; d0= clock[7/3]
+	move.b	(a1)+,d0		; d0= clock
 	move.b	-48(a2,d0.w),d1	; d1= $xxAA
 	and.w	d6,d1		; d1= $00A0
-	move.b	(a1)+,d0		; d0= clock[6/2]
+	move.b	(a1)+,d0		; d0= clock
 	move.b	-48(a2,d0.w),d2	; d2= $xxBB
 	and.w	d7,d2		; d2= $000B
 	or.w	d2,d1		; d1= $00AB
-	move.b	d3,(a0)+		; * ymdmp_clk
-	;;
-
-
-	move.b	(a1)+,d0		; d0= clock[5/1]
-	move.b	-48(a2,d0.w),d3	; d3= $CC
-	and.b	d6,d3		; d3= $C0
-	move.b	(a1)+,d0		; d0= clock[4/0]
-	move.b	-48(a2,d0.w),d2	; d2= $DD
-	and.w	d7,d2		; d2= $0D
-	or.b	d2,d3		; d3= $CD
-	move.b	d3,(a0)+		; * ymdmp_clk
+	move.b	d1,(a0)+		; * ymdmp_clk
 	;; ------------------------------------
 	EndR
 

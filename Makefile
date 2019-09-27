@@ -111,7 +111,7 @@ dir.all = $(sort $(dir.d) $(dir.o) $(dir.tos))
 $(dir.all): ; mkdir -p -- "$@"
 
 $(call objnames,%): %.s $(call depnames,%) $(MAKEFILE_LIST) | $(dir.all)
-	$(VASM.o) $@ -depfile $(call depnames,$*) $<
+	$(VASM.o) $@ -depend=make -depfile $(call depnames,$*) $<
 
 $(call prgnames,%.tos %.ttp %.prg): | $(dir.tos)
 	$(VLINK.tos) $@ $^
