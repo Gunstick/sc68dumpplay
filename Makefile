@@ -97,7 +97,7 @@ all: $(targets)
 
 $(testdmp_prg): INCS = -I$(srcdir)
 $(testyms_prg): INCS = -I$(srcdir)
-$(testyms_prg): test.yms
+$(call objnames,testyms): test.yms
 
 # $(call depnames,testdmp): INCS = -I$(srcdir)
 # $(call depnames,testyms): INCS = -I$(srcdir)
