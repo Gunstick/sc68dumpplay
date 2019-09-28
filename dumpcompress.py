@@ -217,29 +217,29 @@ def ympkst():
   # --------- | --------- | -----------
   # 00DCBA98  | 76543210  | a bit set means named register is present (followed by all bytes starting at R0)
   # 01xxxxxx  |           | reserved    (timer values perhaps?)
-  # 1rr.....  |           | quick set for volume register R(8+0brr)   00 <= rr <= 10
-  # 1rr0nnnn  |           | Rr:={0nnnn}     rr=00 => Rr = R8, 01 => R9, 10 => R10
+  # 1rr.....  |           | quick set for volume register R(7+0brr)   01 <= rr <= 11
+  # 1rr0nnnn  |           | Rr:={0nnnn}     rr=01 => R8, 10 => R9, 11 => R10
   # 1rr10000  |           | Rr:=0x10    = use envelope
   # 1rr10xxx  |           | reserved
   # 1rr11DDD  |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
-  #### if rr==0b11
-  # 11108888  | 9999AAAA  | R8:={8888},  R9:={9999}, R10:={AAAA}  i.e. for digi sound
-  # 1111XXXX  | YYYYYYYY  | RX:={YYYYYYYY}    i.e. for R7 (mixer)
-  # 11111110  | YYYYYYYY  | reserved (could be STE channel mix L^R)
-  # 11111111  | YYYYYYYY  | reserved (could be STE channel mix R)
+  #### if rr==0b00
+  # 10008888  | 9999AAAA  | R8:={8888},  R9:={9999}, R10:={AAAA}  i.e. for digi sound
+  # 1001XXXX  | YYYYYYYY  | RX:={YYYYYYYY}    i.e. for R7 (mixer)
+  # 10011110  | YYYYYYYY  | reserved (could be STE channel mix L^R)
+  # 10011111  | YYYYYYYY  | reserved (could be STE channel mix R)
   ####per register example:
-  # 1000nnnn  |           | R8:={nnnn}
-  # 10010000  |           | R8:=0x10
-  # 10010xxx  |           | reserved
-  # 10011DDD  |           | R8:=0x10 and R13:={1DDD}
-  # 1010nnnn  |           | R9:={nnnn}
-  # 10110000  |           | R9:=0x10
+  # 1010nnnn  |           | R8:={nnnn}
+  # 10110000  |           | R8:=0x10
   # 10110xxx  |           | reserved
-  # 10111DDD  |           | R9:=0x10 and R13:={1DDD}
-  # 1100nnnn  |           | R10:={nnnn}
-  # 11010000  |           | R10:=0x10
+  # 10111DDD  |           | R8:=0x10 and R13:={1DDD}
+  # 1100nnnn  |           | R9:={nnnn}
+  # 11010000  |           | R9:=0x10
   # 11010xxx  |           | reserved
-  # 11011DDD  |           | R10:=0x10 and R13:={1DDD}
+  # 11011DDD  |           | R9:=0x10 and R13:={1DDD}
+  # 1110nnnn  |           | R10:={nnnn}
+  # 11110000  |           | R10:=0x10
+  # 11110xxx  |           | reserved
+  # 11111DDD  |           | R10:=0x10 and R13:={1DDD}
 
   # note: as a 00 frame is followed by each register value as a byte, and a volume only change is also
   # taking 2 bytes (needs each time to have a clock header), if an update changes 2 vol registers, the size requirement
@@ -343,7 +343,7 @@ def ympkst():
 
     # convert a 2Mhz ym clock value to an mfp clock value:
     mfp_ticks=int(round((ymtime-prevymtime) * mfp_adjust))
-    writedump(inputdump,ympkstcycles(mfp_ticks),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x} mfp:{mfp_ticks}') 
+    writedump(inputdump,ympkstcycles(mfp_ticks),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x}(ymticks) mfpticks:{mfp_ticks:x}') 
     prevymtime=ymtime
     # need to decide which method to use for encoding
     # check if only shap register written
@@ -354,20 +354,20 @@ def ympkst():
         if int(prevregistervalues[i],16) > 15:
           break
       if int(prevregistervalues[i],16) > 15:   # we effectively found a register
-        i=(i-8)<<5 # convert it to rr
+        i=(i-7)<<5 # convert it to rr
         #                     1rr11DDD |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
-        writedump(inputdump,0b10011000 | i | shape, 1 , f'R{i+8} shape {shape:04b}')
+        writedump(inputdump,0b10011000 | i | shape, 1 , f'R{i+7} shape {shape:04b}')
         flags=flags & ~(1<<13)
         
     # check if only 1 volume is changed => 1 byte
     if flags == 1<<8:     # is R8 set?
-      writedump(inputdump,0b10000000 | int(registervalues[8],16) | shape,1,'volA')
+      writedump(inputdump,0b10100000 | int(registervalues[8],16) | shape,1,'volA')
       flags=flags & ~(1<<8)
     if flags == 1<<9:     # is R9 set?
-      writedump(inputdump,0b10100000 | int(registervalues[9],16) | shape,1,'volB')
+      writedump(inputdump,0b11000000 | int(registervalues[9],16) | shape,1,'volB')
       flags=flags & ~(1<<9)
     if flags == 1<<10:    # is R10 set?
-      writedump(inputdump,0b11000000 | int(registervalues[10],16) | shape,1,'volC')
+      writedump(inputdump,0b11100000 | int(registervalues[10],16) | shape,1,'volC')
       flags=flags & ~(1<<10)
        
 
@@ -382,7 +382,7 @@ def ympkst():
       while ((i & flags) == 0):
         i = i << 1
         reg += 1
-      writedump(inputdump,((0b11110000 | reg)<<8) + int(registervalues[reg],16),2,f'single register set is {reg} to value {registervalues[reg]}')
+      writedump(inputdump,((0b10010000 | reg)<<8) + int(registervalues[reg],16),2,f'single register set is {reg} to value {registervalues[reg]}')
       flags = flags & ~(1<<reg)
  
     # test if volumes ABC are set together<0x10, write 111088889999AAAA frame (usually sound sample) 2 bytes
@@ -392,8 +392,9 @@ def ympkst():
 
     # if nothing works, just use the simple dumb way: just wite it all out (2 bytes + number of registers)
     if flags != 0:   # still registers left?
-      print(                     "#       00DCBA9876543210")
-      writedump(inputdump,flags,2,f'flags={flags:016b}')
+      print(                     "#       0089ABCD01234567")
+      rotflags=int("".join(reversed(f'{(flags&0xff00)>>6:08b}')) +"".join(reversed(f'{flags&0xff:08b}')),2)
+      writedump(inputdump,rotflags,2,f'flags={rotflags:016b}')
       for i in range(0,14):    # end of range not included
         if 1<<i & flags:
           writedump(inputdump,registervalues[i],1,f'R{i} present.')

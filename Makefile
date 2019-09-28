@@ -87,6 +87,7 @@ ymplay_nude = ymplay ymdump gemdos aes dosread ibuffer
 $(eval $(call target_tpl,ymplay,prg,$(ymplay_nude)))
 $(eval $(call target_tpl,testcli,ttp,testcli))
 $(eval $(call target_tpl,testdmp,tos,testdmp ymdump))
+$(eval $(call target_tpl,testyms,tos,testyms yms))
 
 objects := $(sort $(foreach n,$(programs),$(value $n_objs)))
 depends := $(sort $(foreach n,$(programs),$(value $n_deps)))
@@ -95,7 +96,9 @@ targets := $(foreach n,$(programs),$(value $n_prg))
 all: $(targets)
 
 $(testdmp_prg): INCS = -I$(srcdir)
+$(testyms_prg): INCS = -I$(srcdir)
 $(call depnames,testdmp): INCS = -I$(srcdir)
+$(call depnames,testyms): INCS = -I$(srcdir)
 
 clean: ; rm -f -- $(wildcard $(targets) $(objects) $(depends))
 clean-dir: ; rm -rf -- $(wildcard $(sort $(dir.d) $(dir.o) $(dir.tos)))
