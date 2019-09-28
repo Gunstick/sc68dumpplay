@@ -97,8 +97,10 @@ all: $(targets)
 
 $(testdmp_prg): INCS = -I$(srcdir)
 $(testyms_prg): INCS = -I$(srcdir)
-$(call depnames,testdmp): INCS = -I$(srcdir)
-$(call depnames,testyms): INCS = -I$(srcdir)
+$(testyms_prg): test.yms
+
+# $(call depnames,testdmp): INCS = -I$(srcdir)
+# $(call depnames,testyms): INCS = -I$(srcdir)
 
 clean: ; rm -f -- $(wildcard $(targets) $(objects) $(depends))
 clean-dir: ; rm -rf -- $(wildcard $(sort $(dir.d) $(dir.o) $(dir.tos)))
@@ -118,6 +120,10 @@ $(call objnames,%): %.s $(call depnames,%) $(MAKEFILE_LIST) | $(dir.all)
 
 $(call prgnames,%.tos %.ttp %.prg): | $(dir.tos)
 	$(VLINK.tos) $@ $^
+
+
+%.yms: %.dmp
+	$(srcdir)dumpcompress.py ympkst $< >/dev/null && mv -v -- $<.bin $@
 
 # ----------------------------------------------------------------------
 #  Dependencies

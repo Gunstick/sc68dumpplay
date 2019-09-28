@@ -63,42 +63,10 @@
 ;;; 11111DDD  |           | R10:=0x10 and R13:={1DDD}
 
 
-	Include	"ymdump.i"
+	Include	"yms.i"
 	Include	"debug.i"
 
 	;; -------------------------------------
-
-
-;;; ymdmp_next() - Skip to the next ASCII dump
-;;;
-;;; Inp:
-;;;   a0.l ymdmp struct (unused)
-;;;   a1.l dump string to decode
-;;; Use:
-;;;   d0-d1
-;;; Out:
-;;;   a1.l next dump
-;;;   d0.l: 0=success -1=Error
-;;;   sr#Z: Set on success
-;;;
-ymdmp_next:
-	moveq	#32,d0
-	moveq	#59,d1
-.next0:
-	cmp.b	(a1)+,d0
-	dbge	d1,.next0
-	blt.s	.fail
-
-.next1:
-	cmp.b	(a1)+,d0
-	dblt	d1,.next1
-	bge.s	.fail
-	subq.w	#1,a1
-	moveq	#0,d0
-	rts
-.fail:
-	moveq	#-1,d0
-	rts
 
 ;;; yms_decode() - Decode YMS 
 ;;;
@@ -148,7 +116,7 @@ yms_decode:
 	;; now we have to decide which type it is
 	bmi.s	.short		; one of the short codes %1xxxxxxx
 	;; it is 0sxxxxxx
-	btest #6,d0		; test if it is bit array
+	btst #6,d0		; test if it is bit array
 	beq.s	.endregisters	; reserved
 	;; it is 00xxxxxx
         ;; so we read the second part

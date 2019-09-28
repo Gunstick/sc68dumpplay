@@ -9,6 +9,7 @@
 
 	Include	"debug.i"
 	Include	"ymdump.i"
+	Include	"yms.i"
 	Include	"xbios.i"
 	Include	"start.i"
 
@@ -49,15 +50,15 @@ superrout:
 init_dmp:	;; ------------------------------------
 
 	;; Setup init dump
-	lea	ymdump,a0
-	clr.l	ymdmp_clk(a0)
-	clr.w	ymdmp_clk+4(a0)
-	move.w	#(1<<14)-1,ymdmp_set(a0)
-	lea	ym_intval,a1
-	moveq	#13,d0
-copy_reg:
-	move.b	0(a1,d0.w),ymdmp_reg(a0,d0.w)
-	dbf	d0,copy_reg
+	;; lea	ymdump,a0
+	;; clr.l	ymdmp_clk(a0)
+	;; clr.w	ymdmp_clk+4(a0)
+	;; move.w	#(1<<14)-1,ymdmp_set(a0)
+;; 	lea	ym_intval,a1
+;; 	moveq	#13,d0
+;; copy_reg:
+;; 	move.b	0(a1,d0.w),ymdmp_reg(a0,d0.w)
+;; 	dbf	d0,copy_reg
 
 	lea	line(pc),a0
 	move.l	a0,va_begline
@@ -101,15 +102,15 @@ skip_low:
 	move.w	#$777,$ffff8240.w	;
 
 	;; commit event to YM
-	lea	ymdump(pc),a0
-	bsr	ymsend
-	clr.w	ymdmp_set(a0)
+	;; lea	ymdump(pc),a0
+	;; bsr	ymsend
+	;; clr.w	ymdmp_set(a0)
 
 	;; copy previous timestamp
-	ASSERT	eq,cmpa.l,#ymdump,a0
-	lea	ymprev-ymdump(a0),a1	; a1= ymprev
-	move.l	ymdmp_clk+0(a0),ymdmp_clk+0(a1)
-	move.w	ymdmp_clk+4(a0),ymdmp_clk+4(a1)
+	;; ASSERT	eq,cmpa.l,#ymdump,a0
+	;; lea	ymprev-ymdump(a0),a1	; a1= ymprev
+	;; move.l	ymdmp_clk+0(a0),ymdmp_clk+0(a1)
+	;; move.w	ymdmp_clk+4(a0),ymdmp_clk+4(a1)
 
 	;; get next data
 	move.l	va_curpos,a1
@@ -171,9 +172,9 @@ ymsend:
 
 	DATA
 
-ym_intval:	dc.b	0,0,0,0,0,0		; $0-$5 periods
-	dc.b	0,$3f,0,0,0		; $6-$a noise,mixer,volume
-	dc.b	0,0,0		; $b-$d envelop
+;; ym_intval:	dc.b	0,0,0,0,0,0		; $0-$5 periods
+;; 	dc.b	0,$3f,0,0,0		; $6-$a noise,mixer,volume
+;; 	dc.b	0,0,0		; $b-$d envelop
 	even
 
 va_begline:	ds.l	1
@@ -190,8 +191,8 @@ va_nexttdr:	ds.w	1
 save134:	ds.l	1
 savesr:	ds.w	1
 
-ymprev:	ds.w	3		; only need the clock
-ymdump:	ymdmp_DS
+;; ymprev:	ds.w	3		; only need the clock
+;; ymdump:	ymdmp_DS
 
 line:	incbin	"test.yms"
 eof:
