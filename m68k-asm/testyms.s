@@ -102,8 +102,8 @@ skip_low:
 	move.w	#$777,$ffff8240.w	;
 
 	;; commit event to YM
-	;; lea	ymdump(pc),a0
-	;; bsr	ymsend
+	lea	ymdump+4(pc),a0
+	bsr	ymsend
 	;; clr.w	ymdmp_set(a0)
 
 	;; copy previous timestamp
@@ -124,7 +124,7 @@ skip_low:
 	;; in yms we directly get the delta
 	;lea	ymprev-ymdump(a0),a1	; a1= ymprev (t0)
 	;bsr	ymdmp_dclock		; d0= t1-t0 (timer*128)
-	move.l	(a0),d0	; the yms decoder immediately gives mfp ticks
+	move.l	ymdump(pc),d0	; the yms decoder immediately gives mfp ticks
 
 	;; next event in full precision (timer*128)
 	move.w	va_nxtmfph,d1
@@ -192,7 +192,8 @@ save134:	ds.l	1
 savesr:	ds.w	1
 
 ;; ymprev:	ds.w	3		; only need the clock
-;; ymdump:	ymdmp_DS
+ymdump:	ds.l	1	; delta of mfp ticks
+	ds.w	16	; movep data terminated by $ffff
 
 line:	incbin	"test.yms"
 eof:

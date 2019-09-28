@@ -223,8 +223,8 @@ def ympkst():
   # 1rr10xxx  |           | reserved
   # 1rr11DDD  |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
   #### if rr==0b00
-  # 10008888  | 9999AAAA  | R8:={8888},  R9:={9999}, R10:={AAAA}  i.e. for digi sound
-  # 1001XXXX  | YYYYYYYY  | RX:={YYYYYYYY}    i.e. for R7 (mixer)
+  # 10008888  | AAAA9999  | R8:={8888},  R9:={9999}, R10:={AAAA}  i.e. for digi sound
+  # 1001rrrr  | YYYYYYYY  | Rr:={YYYYYYYY}    i.e. for R7 (mixer): 10010111-00011011
   # 10011110  | YYYYYYYY  | reserved (could be STE channel mix L^R)
   # 10011111  | YYYYYYYY  | reserved (could be STE channel mix R)
   ####per register example:
