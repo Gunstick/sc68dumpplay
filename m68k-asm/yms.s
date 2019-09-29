@@ -114,10 +114,10 @@ yms_decode:
 	moveq	#0,d0
 	move.b (a1)+,d0		; get data
 	;; now we have to decide which type it is
-	bmi.s	.short		; one of the short codes %1xxxxxxx
+	bmi	.short		; one of the short codes %1xxxxxxx
 	;; it is 0sxxxxxx
 	btst #6,d0		; test if it is bit array
-	beq.s	.endregisters	; reserved
+	beq	.endregisters	; reserved
 	;; it is 00xxxxxx
         ;; so we read the second part
 	; first a macro...
@@ -208,7 +208,7 @@ I:	SET 	I+1
 	;and.b #$0f,d0	; not needed as Ym ignores top nibble
 	move.b d0,(a0)+	; valueA
 	move.b (a1)+,d0	; read from stream %9999AAAA
-	move.b #10,4(a0)+ ; volC
+	move.b #10,(a0)+ ; volC
 	move.b d0,(a0)+	; valueC (YM ignores reg9 part)
 	lsr.b #4,d0	; shift reg9 part down
 	move.b #9,(a0)+ ; volB
