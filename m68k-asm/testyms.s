@@ -49,6 +49,12 @@ superrout:
 
 init_dmp:	;; ------------------------------------
 
+	lea	ymsdata,a1
+	bsr yms_header
+	;;; in d0 is now the mfp Hz
+	;;; a1 points to start of stream
+	move.l	a1,va_curpos
+
 	;; Setup init dump
 	;; lea	ymdump,a0
 	;; clr.l	ymdmp_clk(a0)
@@ -60,9 +66,8 @@ init_dmp:	;; ------------------------------------
 ;; 	move.b	0(a1,d0.w),ymdmp_reg(a0,d0.w)
 ;; 	dbf	d0,copy_reg
 
-	lea	line(pc),a0
+	lea	ymsdata(pc),a0
 	move.l	a0,va_begline
-	move.l	a0,va_curpos
 	move.l	#eof,va_endpos
 
 	clr.w	va_nxtmfph
@@ -116,6 +121,8 @@ skip_low:
 	move.l	va_curpos,a1
 	cmp.l	va_endpos,a1
 	bhs	over
+	lea	ymdump(pc),a0
+	;illegal
 	bsr	yms_decode
 	; bsr	yms_next (not needed)
 	move.l	a1,va_curpos
@@ -195,7 +202,7 @@ savesr:	ds.w	1
 ymdump:	ds.l	1	; delta of mfp ticks
 	ds.w	16	; movep data terminated by $ffff
 
-line:	incbin	"test.yms"
+ymsdata:	incbin	"test.yms"
 eof:
 	even
 

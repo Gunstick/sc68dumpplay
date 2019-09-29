@@ -10,6 +10,7 @@
 	IfND	YMS_I
 YMS_I:	set	1
 
+	xref	yms_header
 	xref	yms_decode
 
 	EndC	; YMS_I

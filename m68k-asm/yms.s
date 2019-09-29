@@ -68,6 +68,29 @@
 
 	;; -------------------------------------
 
+;;; yms_header() - read yms header
+;;; Inp:
+;;;   a1.l position in YMS data (should be on timestamp)
+;;; Out:
+;;;   d0.l mfp speed
+;;;   d1.l len od stream
+;;;   a1.l new YMS data position (start of stream)
+yms_header:
+	cmp.l #"YMPK",(a1)
+	bne.s .headererr
+	addq #4,a1
+	cmp.w #"ST",(a1)
+	bne.s .headererr
+	addq #2,a1
+	cmp.w #"10",(a1)   ; we only support v1.0	
+	bne.s .headererr
+	addq #2,a1
+	move.l (a1)+,d0		; get mfp clock into return
+	move.l (a1)+,d1		; get stream leng in d1
+	rts
+.headererr
+	illegal   ; yeah, lol
+
 ;;; yms_decode() - Decode YMS 
 ;;;
 ;;; Inp:
@@ -117,7 +140,9 @@ yms_decode:
 	bmi	.short		; one of the short codes %1xxxxxxx
 	;; it is 0sxxxxxx
 	btst #6,d0		; test if it is bit array
-	beq	.endregisters	; reserved
+	;;; 3F = 00111111
+	;;;      76543210
+	bne	.endregisters	; reserved
 	;; it is 00xxxxxx
         ;; so we read the second part
 	; first a macro...
