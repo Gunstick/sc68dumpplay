@@ -132,6 +132,8 @@ skip_low:
 	;lea	ymprev-ymdump(a0),a1	; a1= ymprev (t0)
 	;bsr	ymdmp_dclock		; d0= t1-t0 (timer*128)
 	move.l	ymdump(pc),d0	; the yms decoder immediately gives mfp ticks
+	lsl.l	#8,d0	; move from gunstick to ben's world
+	lsl.l	#3,d0	; move from gunstick to ben's world
 
 	;; next event in full precision (timer*128)
 	move.w	va_nxtmfph,d1
