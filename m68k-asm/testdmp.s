@@ -13,6 +13,8 @@
 	Include	"start.i"
 
 	STARTUP	main,(a7)
+	illegal			; GB: just for sourcer68
+	bra.w	superrout		;
 main:	SUPEREXEC	#superrout
 	rts
 
@@ -155,9 +157,6 @@ over:
 
 ;;; ymsend()
 ;;;
-ymsend:
-	lea	$ffff8800.w,a6
-	move.w	ymdmp_set(a0),d0
 
 SENDREG:	Macro ; \1:Num
 	lsr	d0
@@ -181,8 +180,56 @@ SENDREG:	Macro ; \1:Num
 	;;
 	EndC
 .skip\@:
-	EndM
+	EndM	; SENDREG
+	
+VOLSEND:	Macro ; \1:volume register
+	move.w	#\1*256,d1		; 4 bytes
+	move.b	\1+ymdmp_reg(a0),d1	; 4 bytes
+	movep.w	d1,0(a6)		; 4 bytes
+	rts			; 2 byte
+	nop			; 2 bytes => 16 bytes
+	EndM	; VOLSEND
 
+GENERAL:	Macro
+	bra.s	.general
+	dcb.w	7,$4e71
+	EndM	; GENERAL
+
+	
+ymsend:
+	lea	$ffff8800.w,a6
+	move.w	ymdmp_set(a0),d0
+
+	cmp.w	#1<<13,d0
+	bne.s	.not_buzz
+
+	;; Buzz only
+	move.w	#$0D00,d1
+	move.b	ymdmp_reg+$D(a0),d1
+	movep.w	d1,0(a6)
+	rts
+	
+.not_buzz:
+	move.w	#%111<<8,d1
+	and.w	d0,d1
+	cmp.w	d0,d1
+	bne	.general
+	lsr	#4,d1
+	jmp	.fastsend(pc,d1.w)
+
+.fastsend:
+	rts			; 0
+	dcb.w	7,$4e71
+	VOLSEND	$8		; 1
+	VOLSEND	$9		; 2
+	GENERAL			; 3
+	VOLSEND	$A		; 4
+	GENERAL			; 5
+	GENERAL			; 6
+	GENERAL			; 7
+
+.general:
+	
 I:	SET	0
 	Rept	14
 	SENDREG	I
