@@ -23,11 +23,11 @@ VLINK = vlink
 VLINK.tos = $(strip $(VLINK) -b ataritos $(TOSFLAGS) $(VL-S) -o)
 
 VASM = vasmm68k_mot
-VASM.o = $(strip $(VASM) $(VASM_ASM) -Felf -o)
+VASM.o = $(strip $(VASM) $(VASM_ASM) -Fvobj -o)
 VASM.d = $(strip $(VASM) $(VASM_DEP) -depend=make -o)
 VASM.tos = $(strip $(VASM) $(VASM_ASM) -monst $(TOSFLAGS) -Ftos -o)
 
-VASM_ASM = -quiet $(DEFS) $(INCS) $(VASM_CPU) -x $(MAXERRORS) $(NOCASE)\
+VASM_ASM = -quiet $(DEFS) -I$(srcdir) $(or $(INCS),-I$(srcdir)) $(VASM_CPU) -x $(MAXERRORS) $(NOCASE)\
  $(NOSYM) $(PIC) $(VASM_MOT) $(VASM_CPU) $(VASM_OPT)
 VASM_DEP = $(VASM_ASM)
 VASM_MOT = $(ALIGN) $(DEVPAC)
@@ -95,9 +95,9 @@ targets := $(foreach n,$(programs),$(value $n_prg))
 
 all: $(targets)
 
-$(testdmp_prg): INCS = -I$(srcdir)
-$(testyms_prg): INCS = -I$(srcdir)
-$(call objnames,testyms): test.yms
+# $(testdmp_prg): INCS = -I$(srcdir)
+# $(testyms_prg): INCS = -I$(srcdir)
+$(call objnames,testyms): $(srcdir)test.yms
 
 # $(call depnames,testdmp): INCS = -I$(srcdir)
 # $(call depnames,testyms): INCS = -I$(srcdir)
@@ -121,9 +121,9 @@ $(call objnames,%): %.s $(call depnames,%) $(MAKEFILE_LIST) | $(dir.all)
 $(call prgnames,%.tos %.ttp %.prg): | $(dir.tos)
 	$(VLINK.tos) $@ $^
 
-
 %.yms: %.dmp
-	$(srcdir)dumpcompress.py ympkst $< >/dev/null && mv -v -- $<.bin $@
+	$(srcdir)dumpcompress.py ympkst $< >/dev/null
+	mv -v -- $<.bin $@
 
 # ----------------------------------------------------------------------
 #  Dependencies
