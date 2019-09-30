@@ -68,16 +68,23 @@ precode:
 	move.w	d3,(a5)+
 	addq.w	#2,a5		; skip jump offset
 
+	moveq	#0,d5		; d5: reg num
 	move.l	a5,a4		; a4: start of frame
 	move.w	ymdmp_set(a0),d0	; bit field
-	moveq	#0,d5		; d5: reg num
+	tst.b	d0
+	bne.s	.loop
+
+	;; skip registers {0-7} if unused
+	moveq	#8,d5
+	moveq	#0,d0
+	move.b	ymdmp_set(a0),d0
+	
 .loop:	;;
 	lsr.w	#1,d0
 	bcc.s	.next
-	move.b	d5,(a5)+		; GB: could optimize that
-	clr.b	(a5)+
-	move.b	ymdmp_reg(a0,d5.w),(a5)+
-	clr.b	(a5)+
+	move.b	d5,(a5)		; GB: could optimize that
+	move.b	ymdmp_reg(a0,d5.w),2(a5)
+	addq.w	#4,a5 
 .next:	;;
 	addq.w	#1,d5
 	tst.w	d0
