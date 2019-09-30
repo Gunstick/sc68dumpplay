@@ -71,6 +71,8 @@
 ;;; yms_header() - read yms header
 ;;; Inp:
 ;;;   a1.l position in YMS data (should be on timestamp)
+;;; Use:
+;;;   d0/d1/a1
 ;;; Out:
 ;;;   d0.l mfp speed
 ;;;   d1.l len od stream
@@ -97,7 +99,10 @@ yms_header:
 ;;;   a0.l ym register dump area to write to
 ;;;   a1.l position in YMS data (should be on timestamp)
 ;;; Use:
-;;;   d0-d7/a2
+;;;   d0/d1/a0/a1
+;;; Out:
+;;;   a0.l end of position of last write
+;;;   a1.l new position in YMS data (should be on timestamp)
 ;;;
 ;;; ym register dump area: 
 ;;;   mfp_ticks:L   $nnnnnnnn

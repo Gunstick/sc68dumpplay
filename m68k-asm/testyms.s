@@ -13,6 +13,9 @@
 	Include	"xbios.i"
 	Include	"start.i"
 
+; future: asynchronous decompress and playing: set to 0
+BUFFERPLAY:	SET 1
+
 	STARTUP	main,(a7)
 main:	SUPEREXEC	#superrout
 	rts
@@ -66,8 +69,8 @@ init_dmp:	;; ------------------------------------
 ;; 	move.b	0(a1,d0.w),ymdmp_reg(a0,d0.w)
 ;; 	dbf	d0,copy_reg
 
-	lea	ymsdata(pc),a0
-	move.l	a0,va_begline
+	lea	ymsdata(pc),a1
+	move.l	a1,va_begline
 	move.l	#eof,va_endpos
 
 	clr.w	va_nxtmfph
@@ -79,13 +82,68 @@ init_dmp:	;; ------------------------------------
 	move.b	#1,$fffffa19.w	; TimerA::TCR=1 -> start 2400-hz
 	;; ------------------------------------
 
+	;; init player
+	lea     ymdump(pc),a0   ; write dump here
+	lea     ymdump(pc),a2   ; read dump here
+	IfEq BUFFERPLAY
+	move.w  #1000,d5
+	move.l  va_curpos,a1    ; read yms here
+fillit: ; pre decode  frames
+	bsr    yms_decode
+	dbf     d5,fillit
+	EndC
 play_dmp:	;; ------------------------------------
+	IfNe BUFFERPLAY
+	lea     ymdump(pc),a2   ; read dump here
+	EndC
+	;; copy previous timestamp
+	;; ASSERT	eq,cmpa.l,#ymdump,a0
+	;; lea	ymprev-ymdump(a0),a1	; a1= ymprev
+	;; move.l	ymdmp_clk+0(a0),ymdmp_clk+0(a1)
+	;; move.w	ymdmp_clk+4(a0),ymdmp_clk+4(a1)
+	move.w	#$070,$ffff8240.w	;
+	;; get next data
+	move.l	va_curpos,a1	; read yms here
+	cmp.l	va_endpos,a1
+	bhs	over
+	bsr	yms_decode
+	; a0 points after the ffff tag
+	IfNe BUFFERPLAY
+	lea	ymdump(pc),a0	; jump back
+	EndC
+	; bsr	yms_next (not needed)
+	move.l	a1,va_curpos
+
+	;; compute delta time to next event
+	;; in yms we directly get the delta
+	;lea	ymprev-ymdump(a0),a1	; a1= ymprev (t0)
+	;bsr	ymdmp_dclock		; d0= t1-t0 (timer*128)
+	move.l	(a2)+,d0	; the yms decoder immediately gives mfp ticks
+	lsl.l	#8,d0	; move from gunstick to ben's world
+	lsl.l	#3,d0	; move from gunstick to ben's world
+
+	;; next event in full precision (timer*128)
+	move.w	va_nxtmfph,d1
+	move.l	va_nxtmfpl,d2
+	add.l	d0,d2
+	moveq	#0,d0
+	addx.w	d0,d1		; d1:d2 nxtmfp
+	move.w	d1,va_nxtmfph
+	move.l	d2,va_nxtmfpl
+	;; convert to timer/4 (divide by 512)
+	lsr	#1,d1		; divide by 2
+	roxr.l	#1,d2
+	move.w	d2,va_nexttdr	; divide by 256
+	move.w	d1,d2		;
+	swap	d2		;
+	move.l	d2,va_nextevt	;
+
 	move.w	#$700,$ffff8240.w
-	moveq	#$39,d0          ;; space key
 	lea	$fffffc02.w,a5   ;; keyboard acia
 	lea	$fffffa1f.w,a4   ;; timerA data
 	lea	va_tacount,a3
 	move.l	va_nextevt,d7
+	moveq	#$39,d0          ;; space key
 test_key:
 	cmp.b	(a5),d0    ;; pressed space?
 	beq	over
@@ -107,49 +165,9 @@ skip_low:
 	move.w	#$777,$ffff8240.w	;
 
 	;; commit event to YM
-	lea	ymdump+4(pc),a0
+	;lea	ymdump+4(pc),a2
 	bsr	ymsend
 	;; clr.w	ymdmp_set(a0)
-
-	;; copy previous timestamp
-	;; ASSERT	eq,cmpa.l,#ymdump,a0
-	;; lea	ymprev-ymdump(a0),a1	; a1= ymprev
-	;; move.l	ymdmp_clk+0(a0),ymdmp_clk+0(a1)
-	;; move.w	ymdmp_clk+4(a0),ymdmp_clk+4(a1)
-
-	;; get next data
-	move.l	va_curpos,a1
-	cmp.l	va_endpos,a1
-	bhs	over
-	lea	ymdump(pc),a0
-	;illegal
-	bsr	yms_decode
-	; bsr	yms_next (not needed)
-	move.l	a1,va_curpos
-
-	;; compute delta time to next event
-	;; in yms we directly get the delta
-	;lea	ymprev-ymdump(a0),a1	; a1= ymprev (t0)
-	;bsr	ymdmp_dclock		; d0= t1-t0 (timer*128)
-	move.l	ymdump(pc),d0	; the yms decoder immediately gives mfp ticks
-	lsl.l	#8,d0	; move from gunstick to ben's world
-	lsl.l	#3,d0	; move from gunstick to ben's world
-
-	;; next event in full precision (timer*128)
-	move.w	va_nxtmfph,d1
-	move.l	va_nxtmfpl,d2
-	add.l	d0,d2
-	moveq	#0,d0
-	addx.w	d0,d1		; d1:d2 nxtmfp
-	move.w	d1,va_nxtmfph
-	move.l	d2,va_nxtmfpl
-	;; convert to timer/4 (divide by 512)
-	lsr	#1,d1		; divide by 2
-	roxr.l	#1,d2
-	move.w	d2,va_nexttdr	; divide by 256
-	move.w	d1,d2		;
-	swap	d2		;
-	move.l	d2,va_nextevt	;
 
 	bra	play_dmp
 over:
@@ -169,14 +187,17 @@ over:
 ;;;
 ymsend:
 	lea	$ffff8800.w,a6
-	;move.w	ymdmp_set(a0),d0	; ?
+	;move.w	ymdmp_set(a2),d0	; ?
 
-	move.w	(a0)+,d1	; assume we at leaast have 1 value
+	move.w	(a2)+,d1	; assume we at leaast have 1 value
 .nextreg:
 	movep.w	d1,0(a6)
-	move.w	(a0)+,d1	; yms struct is just $0rvv $0rvv ...
+	move.w	(a2)+,d1	; yms struct is just $0rvv $0rvv ...
 	bpl.s .nextreg		; end when $ffff
-
+	IfNe BUFFERPLAY
+	;lea 1(a2,d1.w),a2      ; a2+1+(-1)=a2   this does
+	;move.l (a2)+,a2        ; another way for jump back
+	EndC
 	rts
 
 	DATA
@@ -201,8 +222,11 @@ save134:	ds.l	1
 savesr:	ds.w	1
 
 ;; ymprev:	ds.w	3		; only need the clock
-ymdump:	ds.l	1	; delta of mfp ticks
+ymdump:
+	Rept 500
+	ds.l	1	; delta of mfp ticks
 	ds.w	16	; movep data terminated by $ffff
+	EndR
 
 ymsdata:	incbin	"test.yms"
 eof:
