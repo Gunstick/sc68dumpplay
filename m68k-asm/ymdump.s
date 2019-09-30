@@ -167,7 +167,7 @@ R:	Set	R+1		;
 	;; ------------------------------------
 	EndR
 	move.w	d4,(a0)		; * ymdmp_set
-	subq	#ymdmp_set,a0	; a0= ymdmp struct
+	subq.w	#ymdmp_set,a0	; a0= ymdmp struct
 	lea	3*14(a1),a1		; a1= next line
 
 	rts
