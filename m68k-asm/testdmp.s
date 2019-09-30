@@ -7,6 +7,10 @@
 ;;; For more information, please refer to <http://unlicense.org>
 ;;;
 
+	IfND	PDIV
+PDIV:	Set	1
+	EndC
+	
 	Include	"debug.i"
 	Include	"ymdump.i"
 	Include	"xbios.i"
@@ -128,9 +132,9 @@ superrout:
 
 .timeroff:
 	clr.b	$fffffa19.w		; timera::TCR=0 (Stop)
-	;; clr.b	$fffffa1f.w		; timera::TDR=256
+	clr.b	$fffffa1f.w		; timera::TDR=256
 	;; move.b	#128,$fffffa1f.w	; timera::TDR=128
-	move.b	#64,$fffffa1f.w	; timera::TDR=64
+	;; move.b	#64,$fffffa1f.w	; timera::TDR=64
 	
 	move.l	$134.w,save134	; save Timer-A vector
 	move.l	#tArout,$134.w	; install new Timer-A Vector
@@ -169,7 +173,7 @@ play_dmp:	;; ------------------------------------
 	lea	store,a0
 	moveq	#$39,d0
 
-	move.b	#3,$fffffa19.w	; TimerA::TCR=3 -> 153600/TDR
+	move.b	#PDIV,$fffffa19.w	; start timer-A
 play_loop:
   	move.w	#$522,$ffff8240.w
 
@@ -200,10 +204,8 @@ play_loop:
 	blo.s	.synced		; we are late already !
 	bhi.s	.test_key
 .himatch:
-	not.b	d1		; 0->FF 1->FE ... $3F->C0
-	addq.b	#1,d1		; 0->0 1->FF ...
+	neg.b	d1		; 0->0 1->FF ... FF->1
 	beq.s	.resync		; GB: not sure what to do so let's resync
-	and	#63,d1
 	cmp.b	d6,d1
 	blo.s	.resync
 
