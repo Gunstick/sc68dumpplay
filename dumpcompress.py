@@ -12,6 +12,7 @@
 # https://github.com/Gunstick/spriterecord/blob/master/ym2ymx.pl?fbclid=IwAR0N-YjwYHH_GAVuU3liUEq8frp_TxQIZuE0-myG1iu7PH3qVu_5mml8arY#L28
 
 import sys
+import re
 import binascii
 
 def main():
@@ -215,7 +216,7 @@ def ympkst():
   #
   # byte-0    | byte-1    | description
   # --------- | --------- | -----------
-  # 00DCBA98  | 76543210  | a bit set means named register is present (followed by all bytes starting at R0)
+  # 0089ABCD  | 01234567  | 00 + a bit set means named register is present (followed by all bytes starting at R0)
   # 01xxxxxx  |           | reserved    (timer values perhaps?)
   # 1rr.....  |           | quick set for volume register R(7+0brr)   01 <= rr <= 11
   # 1rr0nnnn  |           | Rr:={0nnnn}     rr=01 => R8, 10 => R9, 11 => R10
@@ -312,6 +313,7 @@ def ympkst():
     vbltime=dumpline[0:6]
     ymtime=int(dumpline[7:17],16)
     registervalues=dumpline[18:59].split("-")
+    registervalues=re.split('[-:]',dumpline[18:59])
     if registervalues[13] != "..":
       shape=int(registervalues[13],16)
       if shape<8:    # if lower shape, convert it to upper

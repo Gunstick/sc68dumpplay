@@ -16,4 +16,8 @@ Second version will use an optimized binary format and should be able
 to play accurately enough.
 
 Quick test directly from sndh
-./dumpcompress.py ympkst <(sc68 --ym-engine=dump --ym-clean-dump -qqq -o/dev/null CPU_Eater.sndh)
+sc68 --ym-engine=dump --ym-clean-dump -qqq -o/dev/null CPU_Eater.sndh > CPU_Eater.dmp
+./dumpcompress.py ympkst CPU_Eater.dmp > CPU_Eater.dmp.ascii
+mv CPU_Eater.dmp.bin test.yms
+make
+hatari testyms.tos
