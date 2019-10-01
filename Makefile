@@ -27,8 +27,10 @@ VASM.o = $(strip $(VASM) $(VASM_ASM) -Fvobj -o)
 VASM.d = $(strip $(VASM) $(VASM_DEP) -depend=make -o)
 VASM.tos = $(strip $(VASM) $(VASM_ASM) -monst $(TOSFLAGS) -Ftos -o)
 
-VASM_ASM = -quiet $(DEFS) -I$(srcdir) $(or $(INCS),-I$(srcdir)) $(VASM_CPU) -x $(MAXERRORS) $(NOCASE)\
- $(NOSYM) $(PIC) $(VASM_MOT) $(VASM_CPU) $(VASM_OPT)
+VASM_ASM = -quiet $(DEFS) -I$(srcdir) $(or $(INCS),-I$(srcdir))		\
+ $(VASM_CPU) -x $(MAXERRORS) $(NOCASE) $(NOSYM) $(PIC) $(VASM_MOT)	\
+ $(VASM_CPU) $(VASM_OPT)
+
 VASM_DEP = $(VASM_ASM)
 VASM_MOT = $(ALIGN) $(DEVPAC)
 VASM_CPU = -m68000
@@ -117,6 +119,8 @@ $(dir.all): ; mkdir -p -- "$@"
 
 $(call objnames,%): %.s $(call depnames,%) $(MAKEFILE_LIST) | $(dir.all)
 	$(VASM.o) $@ -depend=make -depfile $(call depnames,$*) $<
+#	$(VASM.o) $@ -depend=make  $< >$(call depnames,$*)
+#	$(VASM.o) $@ $<
 
 $(call prgnames,%.tos %.ttp %.prg): | $(dir.tos)
 	$(VLINK.tos) $@ $^

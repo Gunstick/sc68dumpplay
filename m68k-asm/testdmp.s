@@ -4,17 +4,27 @@
 ;;; @brief   Program testing the ymdump decoder.
 ;;;
 ;;; This is free and unencumbered software released into the public domain.
-;;; For more information, please refer to <http://unlicense.org>
+;;; For more information, please refer to <http://12unlicense.org>
 ;;;
 
-	IfND	PDIV
-PDIV:	Set	1
+	IfND	TCR
+TCR:	Set	3		; 1/3/5 -> 4/16/64
 	EndC
 
 	IfND	TDR
-TDR:	Set	8
+TDR:	Set	8		; log2(TDR)
 	EndC
-	
+
+TDR_MSK:	Set	(1<<TDR)-1
+
+	IfEQ	TCR&1
+	fail	"TCR (not an odd value)"
+	EndC
+
+	IfLT	5-TCR
+	fail	"TCR (>5)"
+	EndC
+
 	Include	"debug.i"
 	Include	"ymdump.i"
 	Include	"xbios.i"
@@ -54,7 +64,7 @@ precode:
 	ASSERT	eq,cmpa.l,#ymdump,a0
 	bsr	ymdmp_dclock		; d0= t1-t0 (timer*128)
 	move.l	(a7)+,a1
-	
+
 	;; next event in full precision (timer*128)
 	move.w	va_nxtmfph,d1
 	move.l	va_nxtmfpl,d2
@@ -64,9 +74,25 @@ precode:
 	move.w	d1,va_nxtmfph
 	move.l	d2,va_nxtmfpl
 
-	;; convert to timer/4 (divide by 512)
-	lsr	#1,d1		; divide by 2
+	;; Adjust the fixed point for the timer setup.
+
+SHR:	Set	TCR-8+TDR		; Number of right shift
+	;;
+	IfGT	SHR
+	Rept	SHR
+	lsr.w	#1,d1		; divide by 2
 	roxr.l	#1,d2
+	echo	">>"
+	EndR
+	Else
+	IfLT	SHR
+	Rept	-SHR
+	add.l	d2,d2
+	addx.w	d1,d1
+	echo	"<<"
+	EndR
+	endC
+	endC
 
 	;; Store this event time
 	move.w	d2,d3
@@ -80,14 +106,14 @@ precode:
 	move.l	a5,a4		; a4: start of frame
 	move.w	ymdmp_set(a0),d0	; bit field
 
-	;; tst.b	d0
-	;; bne.s	.loop
+	tst.b	d0
+	bne.s	.loop
 
-	;; ;; skip registers {0-7} if unused
-	;; moveq	#8,d5
-	;; moveq	#0,d0
-	;; move.b	ymdmp_set(a0),d0
-	
+	;; skip registers {0-7} if unused
+	moveq	#8,d5
+	moveq	#0,d0
+	move.b	ymdmp_set(a0),d0
+
 .loop:	;;
 	lsr.w	#1,d0
 	bcc.s	.next
@@ -101,7 +127,7 @@ precode:
 	;;
 	move.l	a5,d5
 	sub.l	a4,d5		; 4 bytes stored per register
-	lsr.w	#1,d5		; 2 instruction bytes per register
+	lsr.w	#1,d5		; 2 bytes per instructions
 	neg.w	d5		; jump is backward
 	move.w	d5,-(a4)		; * store jump offset
 
@@ -115,12 +141,12 @@ b:
 ;;; ----------------------------------------------------------------------
 ;;;  Main
 ;;; ----------------------------------------------------------------------
-	
+
 	SUPEREXEC	#superrout
 	rts
 
 tArout:	addq.l	#1,va_tacount
-	;; eor.w	#$333,$ffff8240.w
+	;; eor.w	#$070,$ffff8240.w
 	;; move.b	#%11011111,$fffffa0F.w	; release In-Service
 	rte
 
@@ -138,7 +164,7 @@ superrout:
 .timeroff:
 	clr.b	$fffffa19.w		; timera::TCR=0 (Stop)
 	move.b	#(1<<TDR)&255,$fffffa1f.w	; timera::TDR=256
-	
+
 	move.l	$134.w,save134	; save Timer-A vector
 	move.l	#tArout,$134.w	; install new Timer-A Vector
 	move.l	$fffffa06.w,savea06	; save iena
@@ -149,7 +175,7 @@ superrout:
 	swap	d0
 	move.l	d0,$fffffa06.w	;
 	move.l	d0,$fffffa12.w	;
-	
+
 	move.w	#$2500,sr		; IPL=5 (mfp only)
 	bclr	#0,$484.w		; No clicks
 	bclr	#3,$fffffa17.w	; AEI
@@ -173,19 +199,18 @@ play_dmp:	;; ------------------------------------
 	lea	store,a0
 	moveq	#$39,d0
 
-	move.b	#PDIV,$fffffa19.w	; start timer-A
+	move.b	#TCR,$fffffa19.w	; start timer-A
 play_loop:
-  	move.w	#$522,$ffff8240.w
+	move.w	#$522,$ffff8240.w
 
 	move.l	(a0)+,d7		; read event clock
 	move.b	(a0)+,d6		;
-	IfLt	TDR,8
-	lsr.b	#8-TDR,d6		; 256->64
+	IfNE	8-TDR
+	lsr.b	#8-TDR,d6
 	EndC
-	
+
 .test_key:
 	cmp.b	(a5),d0		; <SPACE> ?
-	;; cmp.b	#$39,$fffffc02.w
 	beq	over
 
 	;; d6.b: TDR goal
@@ -200,16 +225,16 @@ play_loop:
 	move.l	(a3),d4		; Counter again
 	cmp.w	d4,d3
 	bne.s	.resync
-	
+
 	cmp.l	d3,d7		; reach ta_count ?
 	beq.s	.himatch
 	blo.s	.synced		; we are late already !
 	bhi.s	.test_key
 .himatch:
 	neg.b	d1		; 0->0 1->FF ... FF->1
-	beq.s	.resync		; GB: not sure what to do so let's resync
-	IfLt	TDR,8
-	and.b	#(1<<TDR)-1,d1
+	beq.s	.resync		; GB: not sure what to do
+	IfNE	255-TDR_MSK
+	and.w	#TDR_MSK,d1
 	EndC
 	cmp.b	d6,d1
 	blo.s	.resync
@@ -223,7 +248,7 @@ play_loop:
 	Rept	14
 	move.l	(a0)+,(a6)
 	EndR
-ymtower:	
+ymtower:
 	cmpa.l	a2,a0
 	blo	play_loop
 	ASSERT	eq,cmpa.l,a0,a2
@@ -245,7 +270,7 @@ over:
 	moveq	#0,d0		; no error
 	rts
 
-	
+
 	DATA
 
 va_eof:	ds.l	1
