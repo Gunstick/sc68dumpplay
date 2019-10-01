@@ -10,6 +10,10 @@
 	IfND	PDIV
 PDIV:	Set	1
 	EndC
+
+	IfND	TDR
+TDR:	Set	8
+	EndC
 	
 	Include	"debug.i"
 	Include	"ymdump.i"
@@ -75,20 +79,21 @@ precode:
 	moveq	#0,d5		; d5: reg num
 	move.l	a5,a4		; a4: start of frame
 	move.w	ymdmp_set(a0),d0	; bit field
-	tst.b	d0
-	bne.s	.loop
 
-	;; skip registers {0-7} if unused
-	moveq	#8,d5
-	moveq	#0,d0
-	move.b	ymdmp_set(a0),d0
+	;; tst.b	d0
+	;; bne.s	.loop
+
+	;; ;; skip registers {0-7} if unused
+	;; moveq	#8,d5
+	;; moveq	#0,d0
+	;; move.b	ymdmp_set(a0),d0
 	
 .loop:	;;
 	lsr.w	#1,d0
 	bcc.s	.next
 	move.b	d5,(a5)		; GB: could optimize that
 	move.b	ymdmp_reg(a0,d5.w),2(a5)
-	addq.w	#4,a5 
+	addq.w	#4,a5
 .next:	;;
 	addq.w	#1,d5
 	tst.w	d0
@@ -132,9 +137,7 @@ superrout:
 
 .timeroff:
 	clr.b	$fffffa19.w		; timera::TCR=0 (Stop)
-	clr.b	$fffffa1f.w		; timera::TDR=256
-	;; move.b	#128,$fffffa1f.w	; timera::TDR=128
-	;; move.b	#64,$fffffa1f.w	; timera::TDR=64
+	move.b	#(1<<TDR)&255,$fffffa1f.w	; timera::TDR=256
 	
 	move.l	$134.w,save134	; save Timer-A vector
 	move.l	#tArout,$134.w	; install new Timer-A Vector
@@ -146,11 +149,8 @@ superrout:
 	swap	d0
 	move.l	d0,$fffffa06.w	;
 	move.l	d0,$fffffa12.w	;
-
-	;; bset	#5,$fffffa07.w	; enable timer-A interrupt
-	;; bset	#5,$fffffa13.w	; unmask timer-A interrupt
 	
-	move.w	#$2300,sr		; IPL=5 (mfp only)
+	move.w	#$2500,sr		; IPL=5 (mfp only)
 	bclr	#0,$484.w		; No clicks
 	bclr	#3,$fffffa17.w	; AEI
 
@@ -179,11 +179,13 @@ play_loop:
 
 	move.l	(a0)+,d7		; read event clock
 	move.b	(a0)+,d6		;
-	lsr	#2,d6		; 256->64
+	IfLt	TDR,8
+	lsr.b	#8-TDR,d6		; 256->64
+	EndC
 	
 .test_key:
-	;; cmp.b	(a5),d0		; <SPACE> ?
-	cmp.b	#$39,$fffffc02.w
+	cmp.b	(a5),d0		; <SPACE> ?
+	;; cmp.b	#$39,$fffffc02.w
 	beq	over
 
 	;; d6.b: TDR goal
@@ -206,6 +208,9 @@ play_loop:
 .himatch:
 	neg.b	d1		; 0->0 1->FF ... FF->1
 	beq.s	.resync		; GB: not sure what to do so let's resync
+	IfLt	TDR,8
+	and.b	#(1<<TDR)-1,d1
+	EndC
 	cmp.b	d6,d1
 	blo.s	.resync
 
@@ -228,8 +233,6 @@ over:
 	move.w	#$2700,sr
 	move.l	savea06,$fffffa06.w
 	move.l	savea12,$fffffa12.w
-	;; bclr	#5,$fffffa07.w	; disable timer-A interrupt
-
 	bset	#3,$fffffa17.w	; SEI
 	move.l	save134,$134.w	; restore timer-A vector
 	move.w	#$777,$ffff8240.w	; restore background color
@@ -237,6 +240,7 @@ over:
 	move.l	#$08000000,(a0)	;
 	move.l	#$09000000,(a0)	;
 	move.l	#$0A000000,(a0)	;
+	move.l	#$0700FF00,(a0)	;
 	stop	#$2300
 	moveq	#0,d0		; no error
 	rts
