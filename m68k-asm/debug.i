@@ -10,7 +10,14 @@
 	IfND	DEBUG_I
 DEBUG_I:	set	1
 
-
+;; macro for debuging and check stuff
+;; i.e. to chack that d0 is #42 at this moment, insert
+;; ASSERT eq,cmp.l,#42,d0
+;; which generates this test:
+;;   cmp.l #42,d0
+;;   beq.s ok
+;;   illegal
+;; ok:
 ASSERT:	Macro ; \1:cc \2:mnemonic \3:op1 \4:op2
 	;; -------------------------------------
 	IfD	DEBUG

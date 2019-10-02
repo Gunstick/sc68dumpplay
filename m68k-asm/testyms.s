@@ -39,7 +39,7 @@ main:	SUPEREXEC	#superrout
 	rts
 
 tArout:	addq.l	#1,va_tacount                   ; this is called at 2400Hz
-	eor.w	#$333,$ffff8240.w
+	;; eor.w	#$333,$ffff8240.w
 	;; move.b	#%11011111,$fffffa0F.w	; release In-Service
 	rte
 
@@ -202,15 +202,15 @@ SHR:	Set	TCR-8+TDR		; Number of right shifts to do
 	lea	va_tacount,a3
 	move.l	va_nextevt,d7	; read event clock
 	moveq	#$39,d0          ;; space key
-test_key:
+.test_key:
 	cmp.b	(a5),d0    ;; pressed space?
 	beq	over
 	;;
-	cmp.l	(a3),d7
+	;cmp.l	(a3),d7
 ;	bhi.s	test_key
 ;	blo.s	skip_low
 
-	move.b	va_nexttdr,d5	; get TDR goal
+	move.b	va_nexttdr,d6	; get TDR goal
 ;	beq.s	skip_low
 
 	;; d6.b: TDR goal
@@ -220,7 +220,9 @@ test_key:
 	;; The idea is that if a timer interrupt has occured the TDR
 	;; has looped
 
+	; ASSERT	eq,cmpa.l,#va_tacount,a3
 	move.l  (a3),d3		; TimerA IRQ Counter value
+	; ASSERT	eq,cmpa.l,#$fa19,a4
 	move.b  (a4),d1		; TDR
 	move.l  (a3),d4		; read again
 	cmp.w	d4,d3		; has it changed?
@@ -229,6 +231,7 @@ test_key:
 	cmp.l	d3,d7		; reach ta_count ?
 	beq.s	.himatch
 	blo.s	.synched	; late, just go ahead trying to catch up
+	bhi.s   .test_key
 .himatch:
 	neg.b	d1		; d1 = 0-d1
 	beq.s	.resync		; GB: not sure what to do
