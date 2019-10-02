@@ -82,14 +82,14 @@ SHR:	Set	TCR-8+TDR		; Number of right shift
 	Rept	SHR
 	lsr.w	#1,d1		; divide by 2
 	roxr.l	#1,d2
-	echo	">>"
+	;echo	">>"
 	EndR
 	Else
 	IfLT	SHR
 	Rept	-SHR
 	add.l	d2,d2
 	addx.w	d1,d1
-	echo	"<<"
+	;echo	"<<"
 	EndR
 	endC
 	endC

@@ -7,6 +7,24 @@
 ;;; For more information, please refer to <http://unlicense.org>
 ;;;
 
+	IfND	TCR
+TCR:	Set	3		; timer control register value: 1/3/5 -> 4/16/64
+	EndC
+
+	IfND TDR
+TDR:	Set	8		; timer data register log2(TCR) ??? gunstick does not understand ???
+	EndC
+
+TDR_MSK:	SET (1<<TDR)-1	; i.e. 8 => 01111111
+
+	IfEQ	TCR & 1
+	fail	"TCR must be odd"
+	EndC
+
+	IfLT	5-TCR
+	fail	"TCR must be less or equal to 5"
+	EndC
+
 	Include	"debug.i"
 	Include	"ymdump.i"
 	Include	"yms.i"
@@ -21,7 +39,7 @@ main:	SUPEREXEC	#superrout
 	rts
 
 tArout:	addq.l	#1,va_tacount                   ; this is called at 2400Hz
-	;; eor.w	#$333,$ffff8240.w
+	eor.w	#$333,$ffff8240.w
 	;; move.b	#%11011111,$fffffa0F.w	; release In-Service
 	rte
 
@@ -40,12 +58,21 @@ superrout:
 
 .timeroff:
 	clr.b	$fffffa19.w		; timera::TCR=0 (Stop)   (see below where TCR is set to 1)
-	clr.b	$fffffa1f.w		; timera::TDR=256
+	move.b	#(1<<TDR)&255,$fffffa1f.w	; timera::TDR=256
 	move.l	$134.w,save134	; save Timer-A vector
 	move.l	#tArout,$134.w	; install new Timer-A Vector
-	bset	#5,$fffffa07.w	; enable timer-A interrupt
-	bset	#5,$fffffa13.w	; unmask timer-A interrupt
-	move.w	#$2300,sr		; IPL=3
+	move.l  $fffffa06.w,savea06     ; save iena
+	move.l  $fffffa12.w,savea12     ; save imsk
+
+	;; Stop all mfp irqs but timer-a
+	moveq #$20,d0
+	swap	d0
+	move.l  d0,$fffffa06.w
+	move.l  d0,$fffffa12.w
+
+	;bset	#5,$fffffa07.w	; enable timer-A interrupt
+	;bset	#5,$fffffa13.w	; unmask timer-A interrupt
+	move.w	#$2500,sr		; IPL=5
 	bclr	#0,$484.w		; No clicks
 	bclr	#3,$fffffa17.w	; AEI
 
@@ -57,6 +84,16 @@ init_dmp:	;; ------------------------------------
 	;;; in d0 is now the mfp Hz
 	;;; a1 points to start of stream
 	move.l	a1,va_curpos
+
+
+	; calculate mfp values from Hz
+	; fmp clock is 2457600
+	; e.g.  153.600Hz / 256 = 600 
+	; with prediv 4: 600/4=150Hz
+	; with prediv 16: 600/16=37.5Hz
+	; for 2.457.600Hz / 256 = 9600
+	; with prediv 4: 9600/4=2400Hz timer
+	; with prediv 16: 9600/16=600Hz timer
 
 	;; Setup init dump
 	;; lea	ymdump,a0
@@ -79,7 +116,11 @@ init_dmp:	;; ------------------------------------
 	clr.l	va_nexttdr
 	clr.l	va_nextevt
 
-	move.b	#1,$fffffa19.w	; TimerA::TCR=1 -> start 2400-hz
+	; start timer A
+	;move.b	#1,$fffffa19.w	; TimerA::TCR=1 (/4)  -> start 2400-hz( 614400 precision)
+	;move.b	#3,$fffffa19.w	; TimerA::TCR=3 (/16) -> start 600-hz ( 153600 precision)
+	;move.b	#5,$fffffa19.w	; TimerA::TCR=5 (/64) -> start 150-hz (  38400 precision)
+	move.b	#TCR,$fffffa19.w	; start timer-A
 	;; ------------------------------------
 
 	;; init player
@@ -130,9 +171,26 @@ play_dmp:	;; ------------------------------------
 	addx.w	d0,d1		; d1:d2 nxtmfp
 	move.w	d1,va_nxtmfph
 	move.l	d2,va_nxtmfpl
-	;; convert to timer/4 (divide by 512)
-	lsr	#1,d1		; divide by 2
+
+	;; Adjust the fixed point for the timer setup.
+SHR:	Set	TCR-8+TDR		; Number of right shifts to do
+	;;
+	IfGT	SHR
+	Rept	SHR
+	lsr.w	#1,d1	; divide by 2
 	roxr.l	#1,d2
+	EndR
+	Else		; SHR<=0
+	IfLT	SHR	; SHR <0
+	Rept	-SHR
+	add.l	d2,d2
+	addx.w	d1,d1
+	EndR
+	endC	; IfLT SHR
+	endC	; IfGT SHR
+
+
+	;; convert to timer/4 (divide by 512)
 	move.w	d2,va_nexttdr	; divide by 256
 	move.w	d1,d2		;
 	swap	d2		;
@@ -142,27 +200,46 @@ play_dmp:	;; ------------------------------------
 	lea	$fffffc02.w,a5   ;; keyboard acia
 	lea	$fffffa1f.w,a4   ;; timerA data
 	lea	va_tacount,a3
-	move.l	va_nextevt,d7
+	move.l	va_nextevt,d7	; read event clock
 	moveq	#$39,d0          ;; space key
 test_key:
 	cmp.b	(a5),d0    ;; pressed space?
 	beq	over
 	;;
 	cmp.l	(a3),d7
-	bhi.s	test_key
-	blo.s	skip_low
+;	bhi.s	test_key
+;	blo.s	skip_low
 
-	move.b	va_nexttdr,d5
-	beq.s	skip_low
+	move.b	va_nexttdr,d5	; get TDR goal
+;	beq.s	skip_low
 
-	;;
-wait_low:
-	move.b	(a4),d6		; d6.b: TDR
-	neg.b	d6
-	cmp.b	d5,d6		;
-	blo.s	wait_low		;
-skip_low:
-	move.w	#$777,$ffff8240.w	;
+	;; d6.b: TDR goal
+	;; d7.l: tacount goal
+
+.resync:	;; GB: Ugly loop to be sure TDR and Counter are in sync.
+	;; The idea is that if a timer interrupt has occured the TDR
+	;; has looped
+
+	move.l  (a3),d3		; TimerA IRQ Counter value
+	move.b  (a4),d1		; TDR
+	move.l  (a3),d4		; read again
+	cmp.w	d4,d3		; has it changed?
+	bne.s	.resync		; if so, rerun, to have consistent data
+
+	cmp.l	d3,d7		; reach ta_count ?
+	beq.s	.himatch
+	blo.s	.synched	; late, just go ahead trying to catch up
+.himatch:
+	neg.b	d1		; d1 = 0-d1
+	beq.s	.resync		; GB: not sure what to do
+	IfNE	255-TDR_MSK
+	and.w	#TDR_MSK,d1	; Gunstick: what does this do?
+	EndC
+	cmp.b	d6,d1		; compare TDR to goal
+	blo.s	.resync		; not yet there
+
+.synched:	; we get here when IRQ counter + timer counter are at the correct value, or more
+	move.w  #$777,$ffff8240.w
 
 	;; commit event to YM
 	;lea	ymdump+4(pc),a2
@@ -172,6 +249,9 @@ skip_low:
 	bra	play_dmp
 over:
 	bclr	#5,$fffffa07.w	; disable timer-A interrupt
+	move.w  #$2700,sr
+	move.l  savea06,$fffffa06.w
+	move.l  savea12,$fffffa12.w
 	clr.b	$fffffa19.w		; Stop timer-A
 	bset	#3,$fffffa17.w	; SEI
 	move.l	save134,$134.w	; restore timer-A vector
@@ -218,6 +298,8 @@ va_tacount:	ds.l	1
 va_nextevt:	ds.l	1
 va_nexttdr:	ds.w	1
 
+savea06:        ds.l    1
+savea12:        ds.l    1
 save134:	ds.l	1
 savesr:	ds.w	1
 
