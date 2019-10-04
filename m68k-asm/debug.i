@@ -21,10 +21,12 @@ DEBUG_I:	set	1
 ASSERT:	Macro ; \1:cc \2:mnemonic \3:op1 \4:op2
 	;; -------------------------------------
 	IfD	DEBUG
+	;; move	sr,-(a7)
 	\2	\3,\4
 	b\1.s	.assert\@
 	illegal
 .assert\@:
+	;; move	(a7)+,ccr
 	EndC	; DEBUG
 	;; -------------------------------------
 	EndM

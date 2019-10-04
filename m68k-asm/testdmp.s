@@ -44,10 +44,11 @@ main:
 	lea	store,a5		; a5: store
 	clr.w	va_nxtmfph
 	clr.l	va_nxtmfpl
-	clr.w	ymprev
-	clr.l	ymprev+2
 
 x:
+	;; Init ympdmp_clk to the first value (rebase dump to 0)
+	bsr	ymdmp_decode
+	lea	line,a1		; a1: ascii dump
 precode:
 	;; Copy previous timestamp
 	ASSERT	eq,cmpa.l,#ymdump,a0
@@ -82,17 +83,15 @@ SHR:	Set	TCR-8+TDR		; Number of right shift
 	Rept	SHR
 	lsr.w	#1,d1		; divide by 2
 	roxr.l	#1,d2
-	;echo	">>"
 	EndR
 	Else
 	IfLT	SHR
 	Rept	-SHR
-	add.l	d2,d2
+	add.l	d2,d2		; multiply by 2
 	addx.w	d1,d1
-	;echo	"<<"
 	EndR
-	endC
-	endC
+	EndC
+	EndC
 
 	;; Store this event time
 	move.w	d2,d3
@@ -210,29 +209,40 @@ play_loop:
 	EndC
 
 .test_key:
-	cmp.b	(a5),d0		; <SPACE> ?
-	beq	over
+	ASSERT	eq,cmp.b,#$39,d0
+	ASSERT	eq,cmpa.w,#$fc02,a5
+	
+	cmp.b	(a5),d0		; Hit <SPC> ?
+	beq	over		; Yes -> Exit
 
 	;; d6.b: TDR goal
 	;; d7.l: tacount goal
 
-.resync:	;; GB: Ugly loop to be sure TDR and Counter are in sync.
-	;; The idea is that if a timer interrupt has occured the TDR
-	;; has loop
+.resync:	;; GB: Sync both time source to be sure the counter is
+	;;     not incremented between both read instructions.
+	;;     Removed the loop, if the counter has changed a read
+	;;     just after is safe.
 
-	move.l	(a3),d3		; Counter
+	move.l	(a3),d4		; Counter
 	move.b	(a4),d1		; TDR
-	move.l	(a3),d4		; Counter again
-	cmp.w	d4,d3
-	bne.s	.resync
-
+	move.l	(a3),d3		; Counter again
+	cmp.w	d4,d3		; word is enough
+	beq.s	.norace		; Same value, all set
+	move.b	(a4),d1		; else just get TDR again
+.norace:
 	cmp.l	d3,d7		; reach ta_count ?
 	beq.s	.himatch
 	blo.s	.synced		; we are late already !
-	bhi.s	.test_key
+	bra.s	.test_key		; !eq & !lo -> hi
 .himatch:
 	neg.b	d1		; 0->0 1->FF ... FF->1
-	beq.s	.resync		; GB: not sure what to do
+
+	;; GB: According to my test on a real 1040-STf it's not
+	;; possible to catch a 0 on the 1 to 0 transition therefore
+	;; it is always the timer reload value (->256).
+	;;
+	*beq.s	.resync		; GB: not sure what to do
+	
 	IfNE	255-TDR_MSK
 	and.w	#TDR_MSK,d1
 	EndC
