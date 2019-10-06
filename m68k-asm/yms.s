@@ -239,10 +239,12 @@ I:	SET 	I+1
 	move.b d0,(a0)+	; valueA
 	move.b (a1)+,d0	; read from stream %9999AAAA
 	move.b #10,(a0)+ ; volC
-	move.b d0,(a0)+	; valueC (YM ignores reg9 part)
+  move.b d0,d1
 	lsr.b #4,d0	; shift reg9 part down
 	move.b #9,(a0)+ ; volB
 	move.b d0,(a0)+ ; valueB
+  and.b #$f,d1    ; mask out reg9 value
+	move.b d1,(a0)+	; valueC (YM ignores reg9 part)
 	;bra.s .endregisters
 
 

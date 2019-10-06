@@ -221,7 +221,8 @@ def ympkst():
   # 1rr.....  |           | quick set for volume register R(7+0brr)   01 <= rr <= 11
   # 1rr0nnnn  |           | Rr:={0nnnn}     rr=01 => R8, 10 => R9, 11 => R10
   # 1rr10000  |           | Rr:=0x10    = use envelope
-  # 1rr10xxx  |           | reserved
+  # 1rr10100  |           | hardsync on period for register rr (01<=rr<=11)
+  # 1rr100xx  |           | reserved
   # 1rr11DDD  |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
   #### if rr==0b00
   # 10008888  | AAAA9999  | R8:={8888},  R9:={9999}, R10:={AAAA}  i.e. for digi sound
@@ -242,6 +243,7 @@ def ympkst():
   # 11110xxx  |           | reserved
   # 11111DDD  |           | R10:=0x10 and R13:={1DDD}
 
+
   # note: as a 00 frame is followed by each register value as a byte, and a volume only change is also
   # taking 2 bytes (needs each time to have a clock header), if an update changes 2 vol registers, the size requirement
   # is for a 00 frame: 2bytes for the bitfield + 2 bytes for the volumes. => 4 bytes
@@ -258,6 +260,13 @@ def ympkst():
   # so in YMPKST11 we have 2 bitfield frames of 1 byte:
   # 00543210  | 00000000 xxxx1111 22222222 xxxx3333 44444444 xxxx5555  freq regs
   # 1110CB76  | xxx66666 xx777777 BBBBBBBB CCCCCCCC   to set noise, mixer and  envelope frequency
+
+  # issue with syncbuzz, the current encoding writes volum and shape each time even if volume has already
+  # selected buzz. Idea is to use another command for the envelope
+  # rrsss : rr=voice 01, 10, 11. sss = shape. If rr=00 then only write shape, but don't enable on any voice.
+  # to disable buzz on a voice, write normally any volume 
+
+
 
   ympkstmagic="YMPKST"
   ympkstversion=1
@@ -300,7 +309,7 @@ def ympkst():
   writedump(inputdump,0,4,"data size big endian uint32 (0 if unknown)")
 
   prevregistervalues="..-..-..-..-..-..-..-..-..-..-..-..-..-..".split("-")
-
+  
   prevymtime=0
   flags=0
   dumpline="x"   # to enter the loop
@@ -308,12 +317,23 @@ def ympkst():
     dumpline=readdump(inputdump)
     if not(dumpline):
       break
-    #                              0  1  2  3  4  5  6  7  8  9 10 11 12 13
+    #                              0. 1  2. 3  4. 5  6  7  8  9 10 11 12 13
     # dumpline="00000F 0000009C80 23-03-23-03-C8-00-1C-23-10-10-..-32-00-0A"
+    #           000000000011111111112222222222333333333344444444445555555555
+    #           012345678901234567890123456789012345678901234567890123456789
     vbltime=dumpline[0:6]
     ymtime=int(dumpline[7:17],16)
     registervalues=dumpline[18:59].split("-")
     registervalues=re.split('[-:]',dumpline[18:59])
+    hardsync=0
+    print(f'# hs detect: A={dumpline[20:21]} B={dumpline[26:27]} C={dumpline[32:33]}')
+    if dumpline[20:21] == ":" :
+      hardsync=(hardsync | 1)
+    if dumpline[26:27] == ":" :
+      hardsync=(hardsync | 0b010)
+    if dumpline[32:33] == ":" :
+      hardsync=(hardsync | 0b100)
+    print(f'# hs detect: {hardsync:03b}')
     if registervalues[13] != "..":
       shape=int(registervalues[13],16)
       if shape<8:    # if lower shape, convert it to upper
@@ -340,15 +360,31 @@ def ympkst():
         flags=(flags<<1)+1
     # we now have a bitfield with a 1 for every register if it's present
     # if nothing is changed, read the next line, without outputting
-    if flags == 0:
+    if flags == 0 and hardsync==0:
       continue
 
     # convert a 2Mhz ym clock value to an mfp clock value:
     mfp_ticks=int(round((ymtime-prevymtime) * mfp_adjust))
     writedump(inputdump,ympkstcycles(mfp_ticks),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x}(ymticks) mfpticks:{mfp_ticks:x}') 
-    prevymtime=ymtime
+    # here we lose precision, we cannot do simply prevymtime=ymtime but instead reconvert from the delta ticks
+    prevymtime=prevymtime+int(mfp_ticks/mfp_adjust)
+    # do hardsync first (we rarely have 3 hardsyncs at the same time, but who knows...)
+    channelnr=1
+    while hardsync != 0:
+      if hardsync & 1:     #  1rr10100
+        writedump(inputdump,0b10010100 | channelnr<<5 , 1 , f'hardsync on voice {channelnr-1}')
+        hswritten=1
+      hardsync=hardsync>>1
+      channelnr=channelnr+1
+      if hswritten and (hardsync!=0 or flags!=0):
+        writedump(inputdump,0,1,'hardsync and more, so need zero clock frame')
+      hswritten=0
+
+    if flags==0:
+      continue 
+
     # need to decide which method to use for encoding
-    # check if only shap register written
+    # check if only shape register written
     if flags == 1<<13:    # only bit for R13 is set
       # check on which channel is the envelope applied, and use that one for setting shape
       # frame looks like 1rr11DDD   rr=00 => 00 = R8, 01 => R9, 10 => R10

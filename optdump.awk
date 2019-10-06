@@ -10,7 +10,8 @@ BEGIN {
   split(". . . . . . . . . . . . . .",prev)
 }
 {#print $3
- printf $1 " " $2 " "
+ output=$1 " " $2 " "
+ rcnt=0
  split($3,cur,"-")
  for (i=1;i<=14;i++) {
    if(i==14){
@@ -22,9 +23,12 @@ BEGIN {
      e="-"
    }
    if(cur[i]==prev[i]) {
-     printf(".." e)}
-   else{ 
-     printf(cur[i] e)
+     output=output ".." e
+   }else{ 
+     output=output cur[i] e
+     if (cur[i]!="..") {
+       rcnt++
+     }
      if(cur[i]!="..") {count[i]++}
    }
    if(cur[i]!="..") {
@@ -38,7 +42,7 @@ BEGIN {
      frequencies[f]++
    }
  }
- print ""
+ if(rcnt!=0) { print output}
  lines++
 }
 END{
