@@ -45,6 +45,10 @@
 
 import sys
 import struct
+debug=0
+def printdebug(s):
+  if debug==1:
+    print(s)
 
 def getbytes(file,count=1):
   # returns read value as int and string
@@ -53,7 +57,7 @@ def getbytes(file,count=1):
   str=b.decode('latin-1')   # just brute force it
   val=int.from_bytes(b, byteorder='big')    # motorola is always big
   mystr=str.replace('\n','\\n')
-  print(f"# got '{mystr}' 0x{val:0{count*2}x} {val}")
+  printdebug(f"# got '{mystr}' 0x{val:0{count*2}x} {val}")
   return {'str': str,'int': val}
 
 #def getbytes(file,count=1):
@@ -70,6 +74,7 @@ vbl=50
 
 fname=sys.argv[1]
 registervalues="00-00-00-00-00-00-00-00-00-00-00-00-00-00".split("-")
+mfp_ticks=0 
 with open(fname, 'rb') as fid:
   byte=getbytes(fid,6)["str"]    # (a1)+
   # print(byte)
@@ -81,10 +86,9 @@ with open(fname, 'rb') as fid:
     print("# only v1.0 supported")
     exit()
   mfpclock=getbytes(fid,4)['int'] # read 4 bytes big endian (motorola format)
-  print(f'# mfp clock is {mfpclock:08x} ({mfpclock:d}Hz)')
+  printdebug(f'# mfp clock is {mfpclock:08x} ({mfpclock:d}Hz)')
   streamlen=getbytes(fid,4)['int']  # read 4 bytes big endian (motorola format)
-  print(f'# len is {streamlen:08x}')
-  ymclock=0 
+  printdebug(f'# len is {streamlen:08x}')
   while 1:
     b=getbytes(fid)
     if b["str"]=="":
@@ -96,7 +100,7 @@ with open(fname, 'rb') as fid:
       deltaclock=(deltaclock+(byte & 0x7f))<<7   # add to clock and shift 1 septet
       byte=getbytes(fid)['int']
     deltaclock=deltaclock+byte
-    print(f'# dclock: {deltaclock:08x}') 
+    printdebug(f'# dclock: {deltaclock:08x}') 
     byte=getbytes(fid)['int']
     if not byte & (1<<7):
       # test if it is bit array
@@ -104,34 +108,34 @@ with open(fname, 'rb') as fid:
         print("# ERROR reserved code")
         exit()
       else:
-        # print("#  it is 00xxxxxx so we read the second part")
+        # printdebug("#  it is 00xxxxxx so we read the second part")
         byte2=byte
         byte=getbytes(fid)['int']
-        print(f"# bitfield decoder start {byte2:08b} {byte:08b}")
+        printdebug(f"# bitfield decoder start {byte2:08b} {byte:08b}")
         rnum=0
         if byte != 0:
-          print(f"# 01234567 bitfield {byte:08b}")
+          printdebug(f"# 01234567 bitfield {byte:08b}")
           bitn=7
           while rnum <8:
             if byte & (1<<bitn):  # bit number bitn is set, so register rnum shall be read
               value=getbytes(fid)['int']
               registervalues[rnum]=f'{value:02x}'
-              print(f'# got R{rnum}={value:02x}')
+              printdebug(f'# got R{rnum}={value:02x}')
             rnum=rnum+1
             bitn=bitn-1
         byte=byte2
         rnum=8
         if byte != 0:
-          print(f"#  0089ABCD {byte:08b}")
+          printdebug(f"#  0089ABCD {byte:08b}")
           bitn=5
           while rnum <14:
             if byte & (1<<bitn):  # bit number bitn is set, so register rnum shall be read
               value=getbytes(fid)['int']
               registervalues[rnum]=f'{value:02x}'
-              print(f'# got R{rnum}={value:02x}')
+              printdebug(f'# got R{rnum}={value:02x}')
             rnum=rnum+1
             bitn=bitn-1
-        print("# bitfield decoder end")
+        printdebug("# bitfield decoder end")
     else:
       # one of the short codes %1xxxxxxx
       if (byte & 0b01100000) != 0: # test for channel 1-3 %1rrxxxxx  (code100 ?)
@@ -149,7 +153,7 @@ with open(fname, 'rb') as fid:
             registervalues[register]=f'{byte:02x}'    # this does not really decode to the original, but YM ignores top 3 bits
             registervalues[13]=f'{byte:02x}' 
         else:  # volonly
-          print(f'# set vol in {register} to {byte:02x}')
+          printdebug(f'# set vol in {register} to {byte:02x}')
           registervalues[register]=f'{byte:02x}' # volume value (ym ignores top 3 bits)
       else:  # code100
         # data is  %100Zxxxx (10008888|9999AAAA, 1001rrrr|YYYYYYYY)
@@ -170,7 +174,8 @@ with open(fname, 'rb') as fid:
           registervalues[10]=f'{byte & 0b00001111:02x}'
             
     # done decoding frame
-    ymclock=ymclock+deltaclock
+    mfp_ticks=mfp_ticks+deltaclock
+    printdebug(f'# mfp_ticks = {mfp_ticks:08x}')
     # emulate the YM
     if registervalues[1]!="..":
       registervalues[1]=f'{int(registervalues[1],16)&0x0f:02x}'  # high freqA mask
@@ -188,7 +193,8 @@ with open(fname, 'rb') as fid:
       registervalues[10]=f'{int(registervalues[10],16)&0x1f:02x}' # volC mask
     if registervalues[13]!="..":
       registervalues[13]=f'{int(registervalues[13],16)&0x0f:02x}' # shape mask
-    vbl=ymclock/40064/mfp_adjust
-    print(f'{int(vbl):06X} {int(ymclock/mfp_adjust):010X} '+"-".join(registervalues).upper())  
+    vbl=mfp_ticks/40064/mfp_adjust
+    ymclock=int(mfp_ticks/mfp_adjust)
+    print(f'{int(vbl):06X} {ymclock:010X} '+"-".join(registervalues).upper())  
     registervalues="..-..-..-..-..-..-..-..-..-..-..-..-..-..".split("-")
   

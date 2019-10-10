@@ -311,6 +311,7 @@ def ympkst():
   prevregistervalues="..-..-..-..-..-..-..-..-..-..-..-..-..-..".split("-")
   
   prevymtime=0
+  mfp_ticks=0     # this is the pseudo mfp counter, where we accumulate deltas
   flags=0
   dumpline="x"   # to enter the loop
   while dumpline:
@@ -323,7 +324,7 @@ def ympkst():
     #           012345678901234567890123456789012345678901234567890123456789
     vbltime=dumpline[0:6]
     ymtime=int(dumpline[7:17],16)
-    registervalues=dumpline[18:59].split("-")
+    #registervalues=dumpline[18:59].split("-")
     registervalues=re.split('[-:]',dumpline[18:59])
     hardsync=0
     print(f'# hs detect: A={dumpline[20:21]} B={dumpline[26:27]} C={dumpline[32:33]}')
@@ -363,11 +364,20 @@ def ympkst():
     if flags == 0 and hardsync==0:
       continue
 
-    # convert a 2Mhz ym clock value to an mfp clock value:
-    mfp_ticks=int(round((ymtime-prevymtime) * mfp_adjust))
-    writedump(inputdump,ympkstcycles(mfp_ticks),-1,f'{ymtime:08x}-{prevymtime:08x}={(ymtime-prevymtime):08x}(ymticks) mfpticks:{mfp_ticks:x}') 
-    # here we lose precision, we cannot do simply prevymtime=ymtime but instead reconvert from the delta ticks
-    prevymtime=prevymtime+int(mfp_ticks/mfp_adjust)
+    # convert a 2Mhz ym clock value to an mfp clock value with int, so we take into account precision errors on decompress:
+    # mfp_ticks is the current timer based clock (i.e. at 2400*256 Hz)
+    # ymtime is the value of the ym clock we want to get close to
+    # convert ymtime into mfp ticks
+    target_mfp_ticks=int(round(ymtime*mfp_adjust))
+    # how much does the mfp have to run from mfp_ticks to target_mfp_ticks to get there
+    mfp_delta=target_mfp_ticks-mfp_ticks
+    # the decompressor will do the calculation like this. Just explicilty do it
+    mfp_ticks=mfp_ticks+mfp_delta   # mfp_ticks is the decompressor counter
+    # for displaying, calculate the offset from the target
+    ym_mfp_offset=int(ymtime-target_mfp_ticks/mfp_adjust)
+    # write the delta to the yms file 
+    writedump(inputdump,ympkstcycles(mfp_delta),-1,f'{ymtime:08x}-{int(mfp_ticks/mfp_adjust):08x}={ym_mfp_offset:08x}(ymticks) mfpdelta:{mfp_delta:x}') 
+    #prevymtime=prevymtime+int(mfp_ticks/mfp_adjust)
     # do hardsync first (we rarely have 3 hardsyncs at the same time, but who knows...)
     channelnr=1
     while hardsync != 0:
@@ -379,7 +389,6 @@ def ympkst():
       if hswritten and (hardsync!=0 or flags!=0):
         writedump(inputdump,0,1,'hardsync and more, so need zero clock frame')
       hswritten=0
-
     if flags==0:
       continue 
 
