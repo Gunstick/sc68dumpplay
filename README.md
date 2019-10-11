@@ -16,8 +16,17 @@ Second version will use an optimized binary format and should be able
 to play accurately enough.
 
 Quick test directly from sndh
-sc68 --ym-engine=dump --ym-clean-dump -qqq -o/dev/null CPU_Eater.sndh > CPU_Eater.dmp
-./dumpcompress.py ympkst CPU_Eater.dmp > CPU_Eater.dmp.ascii
-mv CPU_Eater.dmp.bin test.yms
+'''
+for SNDH_FILE in examples/*.sndh
+do
+  DMP_FILE="${SNDH_FILE/.sndh/}".dmp
+  echo "Working on $SNDH_FILE"
+  sc68 --ym-engine=dump --ym-clean-dump -qqq -o/dev/null "$SNDH_FILE" > "$DMP_FILE"
+  ./dumpcompress.py ympkst "$DMP_FILE"
+done
+
+# test one file:
+cp examples/CPU_Eater.dmp.yms test.yms
 make
 hatari testyms.tos
+'''

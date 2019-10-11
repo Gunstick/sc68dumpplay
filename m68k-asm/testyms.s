@@ -249,6 +249,17 @@ SHL:	Set	8+3-TCR+8-TDR
 	;;
 	;;     movep.l d1,0(a6)  -> 6 nops |
 	;;     move.l (a2)+,d1   -> 3 nops | -> 9 nops -> 4.5 nops per register
+	;; GK: speed of loop with endmarker:
+	;;     move.w (a2)+,d1  -> 2
+	;;     movep.w d1,0(a6) -> 4
+	;;     bpl.s next       -> 3
+	;;     lea 1(a2,d1.w),a2 -> 3
+	;;     ==> Loop takes 9*n+5
+	;; GK: speed of tower
+	;;     ==> with movep: 6*n
+	;;     ==> with movel: 5*n
+	;; GK: speed of immediate tower
+	;;     move.l #00rr00vv,(a6) -> 5 nops
 
 
 	ASSERT	eq,cmpa.w,#$8800,a6	; a6 MUST be $8800.w

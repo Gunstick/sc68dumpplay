@@ -133,8 +133,8 @@ def ymx2encode():
       flags = flags | int('00010000',2)   # set abcnxxxx to abc1xxxx
       
     # we now have flags and register value.
-    print( '#              abcnxxxx               ABCNMFSn')
-    print(f'# flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ')
+    print( '#              abcnxxxx               ABCNMFSn', file=inputdump["outtxtfd"])
+    print(f'# flags={flags:#04x} {flags:#010b} flags2={flags2:#04x} {flags2:#010b} ', file=inputdump["outtxtfd"])
     if flags & int('10000000',2):
       if(registervalues[1]==".."):
         writedump(inputdump,flags | int(prevregistervalues[1],16),1,"")
@@ -327,14 +327,14 @@ def ympkst():
     #registervalues=dumpline[18:59].split("-")
     registervalues=re.split('[-:]',dumpline[18:59])
     hardsync=0
-    print(f'# hs detect: A={dumpline[20:21]} B={dumpline[26:27]} C={dumpline[32:33]}')
+    print(f'# hs detect: A={dumpline[20:21]} B={dumpline[26:27]} C={dumpline[32:33]}', file=inputdump["outtxtfd"])
     if dumpline[20:21] == ":" :
       hardsync=(hardsync | 1)
     if dumpline[26:27] == ":" :
       hardsync=(hardsync | 0b010)
     if dumpline[32:33] == ":" :
       hardsync=(hardsync | 0b100)
-    print(f'# hs detect: {hardsync:03b}')
+    print(f'# hs detect: {hardsync:03b}', file=inputdump["outtxtfd"])
     if registervalues[13] != "..":
       shape=int(registervalues[13],16)
       if shape<8:    # if lower shape, convert it to upper
@@ -439,7 +439,7 @@ def ympkst():
 
     # if nothing works, just use the simple dumb way: just wite it all out (2 bytes + number of registers)
     if flags != 0:   # still registers left?
-      print(                     "#       0089ABCD01234567")
+      print(                     "#       0089ABCD01234567", file=inputdump["outtxtfd"])
       rotflags=int("".join(reversed(f'{(flags&0xff00)>>6:08b}')) +"".join(reversed(f'{flags&0xff:08b}')),2)
       writedump(inputdump,rotflags,2,f'flags={rotflags:016b}')
       for i in range(0,14):    # end of range not included
@@ -487,7 +487,8 @@ def opendump(fname):   # future: return opject with opened in and multiple out f
    # welcome to python: dicts are initiated withh {} but indexed with []
    return {
      "infd": open(fname, 'r'),    # reading file
-     "outbinfd": open(fname+".bin",'wb'),   # writing binary data
+     "outbinfd": open(fname+".yms",'wb'),   # writing binary data
+     "outtxtfd": open(fname+".ascii",'w'),   # writing ascii debug 
      "outcount": 0,               # counts effective number of bytes written
      "incount" : 0               # counts each time bytes are written
    }
@@ -502,8 +503,8 @@ def readdump(fd):
   fd["incount"]=fd["incount"]+4    # ym time on 4 bytes
   fd["incount"]=fd["incount"]+2    # the 2 bytes flag
   fd["incount"]=fd["incount"]+len(dumpline[18:59].replace('.','').replace('-',''))/2   # the changed registers
-  print(   "# vbl    time       freqA freqB freqC N  Mx vA vB vC freqE Sh")
-  print("# "+dumpline, end='')
+  print(   "# vbl    time       freqA freqB freqC N  Mx vA vB vC freqE Sh", file=fd["outtxtfd"])
+  print("# "+dumpline, end='', file=fd["outtxtfd"])
   return dumpline   
 
 def writedump(fd,value,length,comment):     # fd not used yet
@@ -511,19 +512,20 @@ def writedump(fd,value,length,comment):     # fd not used yet
   if length==-1:
     length=int(len(value)/2)    # will make an error if not a string
   if comment != "":
-    print(f'# {comment} v={value} l={length}')
+    print(f'# {comment} v={value} l={length}', file=fd["outtxtfd"])
   try: 
     hexstring=f'{value:0{length*2}x}' # print hex if it's an integer
   except ValueError:
     hexstring=f'{value:0>{length*2}}' # print as string
-  print(hexstring)
+  print(hexstring, file=fd["outtxtfd"])
   fd["outbinfd"].write(binascii.unhexlify(hexstring))
   fd["outcount"]=fd["outcount"]+length
 
 def closedump(fd,ymt):
+  print(f'#read {fd["incount"]} bytes, wrote {fd["outcount"]} bytes ({(1-fd["outcount"]/fd["incount"])*100:.2f}%), for {ymt/40064/50:.2f} s = {fd["outcount"]/(ymt/40064/50):.2f} bytes/s', file=fd["outtxtfd"])
   fd["infd"].close()
   fd["outbinfd"].close()
-  print(f'#read {fd["incount"]} bytes, wrote {fd["outcount"]} bytes ({(1-fd["outcount"]/fd["incount"])*100:.2f}%), for {ymt/40064/50:.2f} s = {fd["outcount"]/(ymt/40064/50):.2f} bytes/s')
+  fd["outtxtfd"].close()
 # welcome to python
 if __name__=="__main__":
    main()
