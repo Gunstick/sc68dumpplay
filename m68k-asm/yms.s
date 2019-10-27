@@ -40,6 +40,7 @@
 ;;; 1rr.....  |           | quick set for volume register R(7+0brr)   01 <= rr <= 11
 ;;; 1rr0nnnn  |           | Rr:={0nnnn}     rr=01 => R8, rr=10 => R9, rr=11 => R10
 ;;; 1rr10000  |           | Rr:=0x10    = use envelope
+;;; 1rr10100  |           | hardsync on period for register rr (01<=rr<=11)
 ;;; 1rr10xxx  |           | reserved
 ;;; 1rr11DDD  |           | Rr:=0x10 and R13={1DDD}   = use envelope and set envelope
 ;;; if rr==0b00
@@ -109,6 +110,9 @@ yms_header:
 ;;;   YM register data (max rept 15)  {$0rvv ...} $ffff
 ;;;
 yms_decode:
+	move.l  a2,-(sp)
+	lea ymstate,a2		; should always point there
+.zeroclock
 	;; Get clock
 	moveq	#0,d0
 	moveq	#0,d1
@@ -155,6 +159,7 @@ WRITEREG:	Macro ; \1:Num
 	add.b d0,d0		; lsl #1
 	bcc.s .nextreg\@	; not written
 	move.b #\1,(a0)+	; reg number
+	move.b (a1),\1(a2)      ; save value to state (only R0-R7)
 	move.b (a1)+,(a0)+ 	; reg value
 .nextreg\@
 	EndM
@@ -204,7 +209,25 @@ I:	SET 	I+1
 	bne.s	.volenv		; 1rr11DDD 
 	; now it is 1rr10xxx, we only need the xxx part
 	and.b #%00000111,d0	; mask out
+	beq.s	.setvolreg
+	btst.b #2,d0		; check hardsync
 	bne.s	.endregisters	; non zero xxx is reserved
+	ASSERT ge,cmp.w,#8,d1
+	ASSERT le,cmp.w,#10,d1
+	; d1=8 => hsA, d1=9 => hsB
+	add.w	d1,d1
+	; d1=16 => hsA, d1=18 => hsB
+	add.w	d1,d1
+	; d1=32 => hsA, d1=36 => hsB
+	jmp	.hsJMP(pc,d1.w)  ; jump to the hardsync rountine 
+.hsJMP:	dc.l .hsA,.hsB,.hsC
+.hsA
+	move.l #$00000100,(a0)+ ; 125Khz
+	move.b #$00,(a0)+	; write old freq from state
+	move.b 0(a2),(a0)+
+	move.b #$01,(a0)+
+	move.b 1(a2),(a0)+
+.setvolreg
 	move.b d1,(a0)+	; volume register number
 	move.b d0,(a0)+	; switch envelope on
 	bra.s .endregisters
@@ -230,6 +253,7 @@ I:	SET 	I+1
 	bge.s	.endregisters	; reserved
 	move.b d0,(a0)+
 	move.b d1,(a0)+
+	move.b d1,0(a2,d0.w)   ; save also into state
 	bra.s .endregisters
 
 .sample	; play typical 3 volumes digisound (modfiles)
@@ -239,21 +263,24 @@ I:	SET 	I+1
 	move.b d0,(a0)+	; valueA
 	move.b (a1)+,d0	; read from stream %9999AAAA
 	move.b #10,(a0)+ ; volC
-  move.b d0,d1
+	move.b d0,d1
 	lsr.b #4,d0	; shift reg9 part down
 	move.b #9,(a0)+ ; volB
 	move.b d0,(a0)+ ; valueB
-  and.b #$f,d1    ; mask out reg9 value
-	move.b d1,(a0)+	; valueC (YM ignores reg9 part)
+	and.b #$f,d1    ; mask out reg9 value
+	move.b d1,(a0)+	; valueC 
 	;bra.s .endregisters
 
 
 .endregisters
+	tst.b	(a1)	; if next clock is zero, continue to read
+	beq	.zeroclock
 	move.w	#-1,(a0)+	; end of registers
 
-
+	move.l  (sp)+,a2
 	rts
-
+ymstate:	; contains current state of the YM
+	ds.b 16
 ;;; Local Variables:
 ;;; mode: asm
 ;;; indent-tabs-mode: t

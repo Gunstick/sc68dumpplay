@@ -43,6 +43,9 @@
   # 10011110  | YYYYYYYY  | reserved (could be STE channel mix L^R)
   # 10011111  | YYYYYYYY  | reserved (could be STE channel mix R)
 
+# define source code string format
+# coding: utf-8
+
 import sys
 import struct
 debug=0
